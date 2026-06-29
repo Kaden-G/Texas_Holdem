@@ -3,6 +3,7 @@ import { evaluateHand, HAND_NAMES, HAND_RANKS } from './hand-eval.js';
 import { createGame, startHand, applyAction, getValidActions, isHandOver, isGameOver, getGameWinner, PHASES, BIG_BLIND, STARTING_CHIPS } from './engine.js';
 import { getAIPersonalities, aiDecision } from './ai.js';
 import { AVATARS, avatarMarkup, pickRandomAvatars } from './avatars.js';
+import { DECKS, deckById } from './decks.js';
 import { initFirebase, createRoom, joinRoom, listenRoom, stopListening, setReady, pushGameState, startOnlineGame, pushAction, clearAction, getClientId, isHost } from './firebase.js';
 import { recordWin, getLeaderboards } from './leaderboard.js';
 
@@ -61,6 +62,37 @@ window.showSetup = () => {
 // ── SETUP (single player) ──
 let setupAICount = 4;
 let setupAvatarId = AVATARS[0].id;
+let setupDeckId = DECKS[0].id;
+
+// Apply the chosen deck design as the back of all face-down cards.
+function setDeckBack(id) {
+  const deck = deckById(id);
+  document.documentElement.style.setProperty('--card-back', `url('${deck.img}')`);
+}
+
+// Shared deck picker (setup + online lobby).
+function deckGalleryHtml(selectedId) {
+  return `<div class="deck-gallery">
+    ${DECKS.map(d => `
+      <button type="button" class="deck-choice ${d.id === selectedId ? 'selected' : ''}" data-deck="${d.id}" title="${d.label}">
+        <span class="deck-swatch" style="background-image:url('${d.img}')"></span>
+        <span class="deck-name">${d.label}</span>
+      </button>`).join('')}
+  </div>`;
+}
+
+function wireDeckGallery(container, onPick) {
+  const gallery = container.querySelector('.deck-gallery');
+  if (!gallery) return;
+  gallery.addEventListener('click', e => {
+    const btn = e.target.closest('.deck-choice');
+    if (!btn) return;
+    onPick(btn.dataset.deck);
+    setDeckBack(btn.dataset.deck);
+    gallery.querySelectorAll('.deck-choice').forEach(b =>
+      b.classList.toggle('selected', b === btn));
+  });
+}
 
 function renderSetup() {
   const grid = $('setup-grid');
@@ -96,6 +128,15 @@ function renderSetup() {
   `;
   grid.appendChild(avatarRow);
   wireAvatarGallery(avatarRow, id => { setupAvatarId = id; });
+
+  const deckRow = document.createElement('div');
+  deckRow.className = 'setup-row setup-row-decks';
+  deckRow.innerHTML = `
+    <label class="setup-label">YOUR DECK</label>
+    ${deckGalleryHtml(setupDeckId)}
+  `;
+  grid.appendChild(deckRow);
+  wireDeckGallery(deckRow, id => { setupDeckId = id; });
 }
 
 // Shared avatar picker (setup + online lobby).
@@ -134,6 +175,7 @@ window.startGame = () => {
   G = createGame(players);
   isOnline = false;
   scored = false;
+  setDeckBack(setupDeckId);
   switchScreen('game-screen');
   beginHand();
 };
@@ -158,6 +200,10 @@ function renderLobbyMenu() {
         <label class="setup-label">YOUR LOOK</label>
         ${avatarGalleryHtml(setupAvatarId)}
       </div>
+      <div class="lobby-row setup-row-decks">
+        <label class="setup-label">YOUR DECK</label>
+        ${deckGalleryHtml(setupDeckId)}
+      </div>
       <div class="lobby-buttons">
         <button class="btn btn-primary" onclick="window.hostGame()">🏠 HOST GAME</button>
         <button class="btn btn-secondary" onclick="window.showJoin()">🚪 JOIN GAME</button>
@@ -173,6 +219,7 @@ function renderLobbyMenu() {
     </div>
   `;
   wireAvatarGallery(body, id => { setupAvatarId = id; });
+  wireDeckGallery(body, id => { setupDeckId = id; });
 }
 
 window.showJoin = () => {
@@ -256,6 +303,7 @@ window.launchOnline = async () => {
   G = startHand(G);
   isOnline = true;
   scored = false;
+  setDeckBack(setupDeckId);
   seq++;
   await startOnlineGame();
   await pushGameState(G, seq);
@@ -271,6 +319,7 @@ function onRoomUpdate(data) {
       seq = data.seq || 0;
       G = parsed;
       isOnline = true;
+      setDeckBack(setupDeckId);
       switchScreen('game-screen');
       renderGame();
       if (isGameOver(G)) showGameOver();
@@ -689,3 +738,4 @@ function logMsg(text) {
 
 // ── INIT ──
 renderSetup();
+setDeckBack(setupDeckId);

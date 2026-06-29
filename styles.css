@@ -597,15 +597,11 @@ body {
 }
 
 .card-facedown {
-  background: linear-gradient(135deg, var(--saloon-red) 0%, #4a0e0e 100%);
+  background-image: var(--card-back, linear-gradient(135deg, var(--saloon-red) 0%, #4a0e0e 100%));
+  background-size: cover;
+  background-position: center;
   border: 2px solid var(--saloon-gold);
   box-shadow: 0 2px 8px rgba(0,0,0,0.5);
-}
-.card-facedown::after {
-  content: '✦';
-  color: var(--saloon-gold);
-  font-size: 50px;
-  opacity: 0.5;
 }
 
 /* Real-card face: corner indices + center pip/letter */
@@ -1101,6 +1097,51 @@ body {
 }
 .avatar-choice .avatar { border-color: var(--saloon-wood-light); }
 .avatar-choice.selected .avatar { border-color: var(--saloon-gold-bright); }
+
+/* Deck-back picker */
+.setup-row-decks { align-items: flex-start; }
+.deck-gallery {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: center;
+  max-width: 380px;
+}
+.deck-choice {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+  width: 86px;
+  padding: 5px;
+  border: 2px solid transparent;
+  border-radius: 8px;
+  background: none;
+  cursor: pointer;
+  transition: transform 0.12s, border-color 0.12s;
+}
+.deck-choice:hover { transform: translateY(-2px); }
+.deck-choice.selected {
+  border-color: var(--saloon-gold-bright);
+  box-shadow: 0 0 10px rgba(230,198,90,0.5);
+}
+.deck-swatch {
+  width: 64px;
+  height: 90px;
+  border-radius: 6px;
+  background-size: cover;
+  background-position: center;
+  border: 1px solid var(--saloon-wood-light);
+  box-shadow: 0 2px 5px rgba(0,0,0,0.5);
+}
+.deck-name {
+  font-family: 'IM Fell English SC', serif;
+  font-size: 12px;
+  line-height: 1.15;
+  color: var(--saloon-cream);
+  text-align: center;
+}
+.deck-choice.selected .deck-name { color: var(--saloon-gold-bright); }
 
 /* Seat avatar */
 .player-avatar-wrap {
