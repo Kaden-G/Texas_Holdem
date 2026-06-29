@@ -28,38 +28,15 @@ body {
   color: var(--text-light);
   min-height: 100vh;
   overflow-x: hidden;
-  /* Weathered walnut planks */
-  background-color: #3a2517;
+  /* Photoreal weathered walnut planks (dark walnut fallback if it fails to load) */
+  background-color: #241510;
   background-image:
-    /* plank seams — dark groove with a faint top highlight */
-    repeating-linear-gradient(0deg,
-      rgba(255,212,160,0.05) 0px,
-      rgba(0,0,0,0) 2px,
-      rgba(0,0,0,0) 88px,
-      rgba(0,0,0,0.55) 90px,
-      rgba(0,0,0,0.22) 92px),
-    /* alternating plank tone */
-    repeating-linear-gradient(0deg,
-      rgba(255,255,255,0.028) 0px,
-      rgba(255,255,255,0.028) 90px,
-      rgba(0,0,0,0.06) 90px,
-      rgba(0,0,0,0.06) 180px),
-    /* fine horizontal grain */
-    repeating-linear-gradient(0deg,
-      rgba(90,55,30,0) 0px,
-      rgba(90,55,30,0.25) 1px,
-      rgba(120,80,50,0) 4px,
-      rgba(40,22,12,0.18) 6px,
-      rgba(90,55,30,0) 9px),
-    /* long weathering streaks */
-    repeating-linear-gradient(90deg,
-      rgba(0,0,0,0.05) 0px,
-      rgba(0,0,0,0) 7px,
-      rgba(160,120,80,0.04) 13px,
-      rgba(0,0,0,0) 22px),
-    /* vignette + base walnut gradient */
-    radial-gradient(ellipse at 50% 28%, rgba(96,62,38,0.4) 0%, transparent 72%),
-    linear-gradient(180deg, #4a3120 0%, #2a1810 100%);
+    radial-gradient(ellipse at 50% 38%, rgba(20,10,5,0.12) 0%, rgba(12,7,4,0.62) 100%),
+    url('assets/textures/walnut.jpg');
+  background-repeat: no-repeat, no-repeat;
+  background-size: cover, cover;
+  background-position: center, center;
+  background-attachment: fixed, fixed;
 }
 
 /* ── SCREENS ── */
@@ -212,6 +189,14 @@ body {
 /* ── SETUP SCREEN ── */
 #setup-screen {
   justify-content: center;
+}
+
+.setup-sign {
+  display: block;
+  width: min(82vw, 380px);
+  height: auto;
+  margin: 0 auto 14px;
+  filter: drop-shadow(0 10px 22px rgba(0,0,0,0.7));
 }
 
 .panel-header {
@@ -993,41 +978,18 @@ body {
   border-radius: 50%;
   position: relative;
   flex: none;
-  border: 1px solid rgba(0,0,0,0.35);
-  box-shadow: 0 2px 3px rgba(0,0,0,0.5);
-}
-/* white edge dashes, masked to the outer ring */
-.chip::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  border-radius: 50%;
-  background: repeating-conic-gradient(rgba(255,255,255,0.92) 0 10deg, transparent 10deg 30deg);
-  -webkit-mask: radial-gradient(transparent 54%, #000 56%);
-          mask: radial-gradient(transparent 54%, #000 56%);
-}
-/* inner face */
-.chip::before {
-  content: '';
-  position: absolute;
-  inset: 24%;
-  border-radius: 50%;
-  background: rgba(255,255,255,0.14);
-  border: 1px solid rgba(255,255,255,0.28);
+  background-image: url('assets/chips/chip.png');
+  background-size: cover;
+  background-position: center;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.6);
 }
 /* sizes + stack overlap */
-.chip-lg .chip { width: 44px; height: 44px; }
-.chip-lg .chip { margin-top: -35px; }
+.chip-lg .chip { width: 46px; height: 46px; }
+.chip-lg .chip { margin-top: -37px; }
 .chip-lg .chip:first-child { margin-top: 0; }
-.chip-sm .chip { width: 22px; height: 22px; }
-.chip-sm .chip { margin-top: -17px; }
+.chip-sm .chip { width: 24px; height: 24px; }
+.chip-sm .chip { margin-top: -19px; }
 .chip-sm .chip:first-child { margin-top: 0; }
-/* denominations */
-.c1   { background: radial-gradient(circle at 50% 36%, #fafafa, #c9c9c9 72%); }
-.c5   { background: radial-gradient(circle at 50% 36%, #d7493f, #9e1b13 72%); }
-.c25  { background: radial-gradient(circle at 50% 36%, #2fa15a, #136b30 72%); }
-.c100 { background: radial-gradient(circle at 50% 36%, #3a3a3a, #101010 72%); }
-.c500 { background: radial-gradient(circle at 50% 36%, #8a5bd0, #4a1f86 72%); }
 
 /* per-seat bet chips */
 .player-bet {
