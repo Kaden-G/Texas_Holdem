@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>DEAD HAND SALOON — Texas Hold'em</title>
-<link rel="stylesheet" href="styles.css?v=2">
+<link rel="stylesheet" href="styles.css?v=3">
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
 </head>
@@ -67,8 +67,25 @@
   </div>
 
   <div class="log-panel">
-    <div class="log-label">SALOON TALK</div>
-    <div id="game-log"></div>
+    <div class="log-section log-talk">
+      <div class="log-label">SALOON TALK</div>
+      <div id="game-log"></div>
+    </div>
+    <div class="log-section log-ranks">
+      <div class="log-label">HAND RANKINGS</div>
+      <ol class="hand-ranks">
+        <li><span class="hr-name">Royal Flush</span><span class="hr-ex">A K Q J 10 <i class="s-red">&hearts;</i></span></li>
+        <li><span class="hr-name">Straight Flush</span><span class="hr-ex">9 8 7 6 5 &spades;</span></li>
+        <li><span class="hr-name">Four of a Kind</span><span class="hr-ex">Q Q Q Q</span></li>
+        <li><span class="hr-name">Full House</span><span class="hr-ex">K K K 2 2</span></li>
+        <li><span class="hr-name">Flush</span><span class="hr-ex">A J 8 5 2 <i class="s-red">&diams;</i></span></li>
+        <li><span class="hr-name">Straight</span><span class="hr-ex">10 9 8 7 6</span></li>
+        <li><span class="hr-name">Three of a Kind</span><span class="hr-ex">7 7 7</span></li>
+        <li><span class="hr-name">Two Pair</span><span class="hr-ex">A A 9 9</span></li>
+        <li><span class="hr-name">One Pair</span><span class="hr-ex">J J</span></li>
+        <li><span class="hr-name">High Card</span><span class="hr-ex">A high</span></li>
+      </ol>
+    </div>
   </div>
 </div>
 
@@ -83,6 +100,6 @@
   </div>
 </div>
 
-<script type="module" src="src/app.js?v=2"></script>
+<script type="module" src="src/app.js?v=3"></script>
 </body>
 </html>
