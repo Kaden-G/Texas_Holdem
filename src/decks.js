@@ -7,7 +7,7 @@ export const DECK_DIR = 'assets/decks';
 
 const DECK_NAMES = [
   'Lone Star Compass',    // 01 — navy compass / star rose
-  "Kaden's Classic",      // 02 — longhorn skulls (day of the dead)
+  'Longhorn',             // 02 — longhorn skulls
   'Crossed Irons',        // 03 — crossed revolvers
   'Desert Sun',           // 04 — desert / cacti scene
   'Diamondback',          // 05 — black diamond lattice
@@ -16,6 +16,9 @@ const DECK_NAMES = [
   'The House Deck',       // 08 — gold monogram sunburst
   "Walter's Pick",        // 09 — ravens (the "Seahawk")
   'The Randall Special',  // 10 — grim reaper
+  "Kaden's Classic",      // 11 — Día de los Muertos mariachi skeleton
+  'Tall Timbers',         // 12 — lone rider among the redwoods
+  'Frontier Map',         // 13 — old parchment territory map
 ];
 
 export const DECKS = DECK_NAMES.map((name, i) => {
