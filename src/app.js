@@ -413,6 +413,17 @@ function renderGame() {
   renderLog();
 }
 
+// Real-card face: rank+suit indices in opposite corners, a large center
+// pip for number cards (and aces), a big letter for face cards.
+const FACE_RANKS = ['J', 'Q', 'K'];
+function cardFaceHtml(card) {
+  const corner = `<span class="cc-rank">${card.rank}</span><span class="cc-suit">${card.suit}</span>`;
+  const center = FACE_RANKS.includes(card.rank)
+    ? `<span class="card-center card-face-letter">${card.rank}</span>`
+    : `<span class="card-center card-pip">${card.suit}</span>`;
+  return `<span class="card-corner tl">${corner}</span>${center}<span class="card-corner br">${corner}</span>`;
+}
+
 function renderCommunity() {
   const area = $('community-cards');
   area.innerHTML = '';
@@ -421,7 +432,7 @@ function renderCommunity() {
     const el = document.createElement('div');
     if (card) {
       el.className = `card ${isRed(card) ? 'red' : 'black'}`;
-      el.innerHTML = `<span class="card-rank">${card.rank}</span><span class="card-suit">${card.suit}</span>`;
+      el.innerHTML = cardFaceHtml(card);
     } else {
       el.className = 'card card-placeholder';
       el.innerHTML = '<span class="card-back">🂠</span>';
@@ -450,7 +461,7 @@ function renderPlayers() {
     if (p.hand.length === 2) {
       if (showCards) {
         cardsHtml = p.hand.map(c =>
-          `<div class="card card-small ${isRed(c) ? 'red' : 'black'}"><span class="card-rank">${c.rank}</span><span class="card-suit">${c.suit}</span></div>`
+          `<div class="card card-small ${isRed(c) ? 'red' : 'black'}">${cardFaceHtml(c)}</div>`
         ).join('');
       } else {
         cardsHtml = `<div class="card card-small card-facedown"></div><div class="card card-small card-facedown"></div>`;
@@ -512,48 +523,43 @@ function renderActions() {
     return;
   }
 
-  const player = G.players[G.activeIndex];
-  if (!player) return;
+  // The betting menu stays put: it's shown for the human every turn and just
+  // disabled (greyed) while we wait on someone else — never removed.
+  const mySeat = isOnline ? (G.clientMap?.[myClientId] ?? 0) : G.players.findIndex(p => !p.isAI);
+  const me = G.players[mySeat];
+  const activePlayer = G.players[G.activeIndex];
+  const myTurn = !!me && G.activeIndex === mySeat && !me.folded && !me.allIn;
 
-  const isMyTurn = isOnline ? (G.clientMap?.[myClientId] === G.activeIndex) : !player.isAI;
-  if (!isMyTurn) {
-    const wait = document.createElement('div');
-    wait.className = 'wait-msg';
-    wait.textContent = `Waiting for ${player.name}...`;
-    panel.appendChild(wait);
-    return;
-  }
+  const hint = document.createElement('div');
+  hint.className = 'turn-hint' + (myTurn ? ' your-move' : '');
+  hint.textContent = myTurn ? 'YOUR MOVE'
+    : me?.folded ? 'You folded — waiting…'
+    : `Waiting for ${activePlayer?.name || '…'}…`;
+  panel.appendChild(hint);
 
-  const valid = getValidActions(G);
-  const toCall = G.currentBet - player.currentBet;
+  if (!me || me.folded || me.allIn || me.chips <= 0) return;
 
-  if (valid.includes('fold')) {
+  const toCall = Math.max(0, G.currentBet - me.currentBet);
+  const validList = myTurn ? getValidActions(G) : null;
+  const can = a => myTurn ? validList.includes(a) : inferAction(a, me, toCall);
+  const dis = !myTurn;
+
+  const addBtn = (cls, label, onclick) => {
     const btn = document.createElement('button');
-    btn.className = 'btn btn-danger';
-    btn.textContent = 'FOLD';
-    btn.onclick = window.doFold;
+    btn.className = 'btn ' + cls;
+    btn.textContent = label;
+    if (dis) btn.disabled = true; else btn.onclick = onclick;
     panel.appendChild(btn);
-  }
+  };
 
-  if (valid.includes('check')) {
-    const btn = document.createElement('button');
-    btn.className = 'btn btn-secondary';
-    btn.textContent = 'CHECK';
-    btn.onclick = window.doCheck;
-    panel.appendChild(btn);
-  }
+  if (can('fold')) addBtn('btn-danger', 'FOLD', window.doFold);
+  if (can('check')) addBtn('btn-secondary', 'CHECK', window.doCheck);
+  if (can('call')) addBtn('btn-primary', `CALL $${toCall}`, window.doCall);
 
-  if (valid.includes('call')) {
-    const btn = document.createElement('button');
-    btn.className = 'btn btn-primary';
-    btn.textContent = `CALL $${toCall}`;
-    btn.onclick = window.doCall;
-    panel.appendChild(btn);
-  }
-
-  if (valid.includes('raise')) {
+  if (can('raise')) {
     const minTotal = G.currentBet + G.minRaise;
-    const maxTotal = player.currentBet + player.chips;
+    const maxTotal = me.currentBet + me.chips;
+    const da = dis ? 'disabled' : '';
 
     // Quick-bet chips ($50/$100/… increments) so the player isn't nudging the slider.
     const increments = [50, 100, 150, 250].filter(a => minTotal + a <= maxTotal);
@@ -562,42 +568,50 @@ function renderActions() {
     raiseWrap.className = 'raise-controls';
     raiseWrap.innerHTML = `
       <div class="raise-quick" id="raise-quick">
-        <button class="btn-chip" data-set="${minTotal}">MIN</button>
-        ${increments.map(a => `<button class="btn-chip" data-add="${a}">+$${a}</button>`).join('')}
-        <button class="btn-chip" data-set="${maxTotal}">MAX</button>
+        <button class="btn-chip" data-set="${minTotal}" ${da}>MIN</button>
+        ${increments.map(a => `<button class="btn-chip" data-add="${a}" ${da}>+$${a}</button>`).join('')}
+        <button class="btn-chip" data-set="${maxTotal}" ${da}>MAX</button>
       </div>
       <div class="raise-row">
-        <input type="range" id="raise-slider" class="raise-slider" min="${minTotal}" max="${maxTotal}" value="${minTotal}" step="${BIG_BLIND}">
+        <input type="range" id="raise-slider" class="raise-slider" min="${minTotal}" max="${maxTotal}" value="${minTotal}" step="${BIG_BLIND}" ${da}>
         <span class="raise-val" id="raise-val">$${minTotal}</span>
-        <button class="btn btn-primary" onclick="window.doRaise()">RAISE</button>
+        <button class="btn btn-primary" ${dis ? 'disabled' : 'onclick="window.doRaise()"'}>RAISE</button>
       </div>
     `;
     panel.appendChild(raiseWrap);
 
-    setTimeout(() => {
-      const slider = $('raise-slider');
-      const quick = $('raise-quick');
-      if (!slider) return;
-      const setVal = v => {
-        slider.value = Math.max(minTotal, Math.min(maxTotal, v));
-        $('raise-val').textContent = `$${slider.value}`;
-      };
-      slider.oninput = () => { $('raise-val').textContent = `$${slider.value}`; };
-      quick.onclick = e => {
-        const btn = e.target.closest('button');
-        if (!btn) return;
-        if (btn.dataset.set != null) setVal(+btn.dataset.set);
-        else if (btn.dataset.add != null) setVal(+slider.value + +btn.dataset.add);
-      };
-    }, 0);
+    if (!dis) {
+      setTimeout(() => {
+        const slider = $('raise-slider');
+        const quick = $('raise-quick');
+        if (!slider) return;
+        const setVal = v => {
+          slider.value = Math.max(minTotal, Math.min(maxTotal, v));
+          $('raise-val').textContent = `$${slider.value}`;
+        };
+        slider.oninput = () => { $('raise-val').textContent = `$${slider.value}`; };
+        quick.onclick = e => {
+          const btn = e.target.closest('button');
+          if (!btn) return;
+          if (btn.dataset.set != null) setVal(+btn.dataset.set);
+          else if (btn.dataset.add != null) setVal(+slider.value + +btn.dataset.add);
+        };
+      }, 0);
+    }
   }
 
-  if (valid.includes('all-in')) {
-    const btn = document.createElement('button');
-    btn.className = 'btn btn-allin';
-    btn.textContent = `ALL IN $${player.chips}`;
-    btn.onclick = window.doAllIn;
-    panel.appendChild(btn);
+  if (can('all-in')) addBtn('btn-allin', `ALL IN $${me.chips}`, window.doAllIn);
+}
+
+// Which actions to *show* (disabled) for the human while it's not their turn.
+function inferAction(a, me, toCall) {
+  switch (a) {
+    case 'fold': return true;
+    case 'check': return toCall === 0;
+    case 'call': return toCall > 0;
+    case 'raise': return me.chips > toCall;
+    case 'all-in': return me.chips > 0;
+    default: return false;
   }
 }
 

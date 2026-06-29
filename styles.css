@@ -527,28 +527,45 @@ body {
   opacity: 0.5;
 }
 
-.card-rank {
+/* Real-card face: corner indices + center pip/letter */
+.card-corner {
+  position: absolute;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  line-height: 0.92;
   font-family: 'Playfair Display', serif;
-  font-size: 60px;
-  font-weight: 900;
+  font-weight: 800;
+}
+.card-corner.tl { top: 9px; left: 11px; }
+.card-corner.br { bottom: 9px; right: 11px; transform: rotate(180deg); }
+.cc-rank { font-size: 30px; }
+.cc-suit { font-size: 23px; margin-top: 1px; }
+
+.card-center {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
   line-height: 1;
 }
-
-.card-suit {
-  font-size: 66px;
-  line-height: 1;
+.card-pip { font-size: 92px; }
+.card-face-letter {
+  font-family: 'Playfair Display', serif;
+  font-weight: 900;
+  font-size: 88px;
 }
 
 .card-small {
   width: 54px;
   height: 76px;
 }
-.card-small .card-rank {
-  font-size: 22px;
-}
-.card-small .card-suit {
-  font-size: 24px;
-}
+.card-small .card-corner.tl { top: 4px; left: 5px; }
+.card-small .card-corner.br { bottom: 4px; right: 5px; }
+.card-small .cc-rank { font-size: 15px; }
+.card-small .cc-suit { font-size: 11px; }
+.card-small .card-pip { font-size: 34px; }
+.card-small .card-face-letter { font-size: 30px; }
 
 /* ── PLAYERS ── */
 #players-area {
@@ -758,6 +775,30 @@ body {
   font-style: italic;
   padding: 8px;
 }
+
+/* Persistent turn indicator above the always-present betting menu */
+.turn-hint {
+  flex-basis: 100%;
+  text-align: center;
+  font-family: 'Rye', cursive;
+  font-size: 14px;
+  letter-spacing: 2px;
+  color: var(--text-dim);
+  margin-bottom: 2px;
+}
+.turn-hint.your-move { color: var(--saloon-gold-bright); }
+
+/* Greyed-out look while waiting on other players */
+.btn:disabled,
+.btn-chip:disabled {
+  opacity: 0.4;
+  cursor: default;
+  filter: grayscale(0.35);
+  box-shadow: none;
+}
+.btn:disabled:hover,
+.btn-chip:disabled:hover { background: inherit; }
+.raise-slider:disabled { opacity: 0.4; cursor: default; }
 
 /* ── LOG (right-hand sidebar: SALOON TALK over HAND RANKINGS) ── */
 .log-panel {
