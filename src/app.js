@@ -338,16 +338,11 @@ function checkAITurn() {
 }
 
 function showHandResult() {
+  // Stay on the finished hand so the player can review it; advancing happens
+  // only when they click "NEXT HAND" (window.continueGame).
   pendingReveal = true;
-  renderGame();
   clearTimeout(revealTimer);
-  revealTimer = setTimeout(() => {
-    if (isGameOver(G)) {
-      showGameOver();
-    } else {
-      beginHand();
-    }
-  }, 4000);
+  renderGame();
 }
 
 function showGameOver() {
