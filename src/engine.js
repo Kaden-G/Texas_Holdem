@@ -291,15 +291,18 @@ function resolveShowdown(game) {
   const allBets = g.players.map(p => p.totalBet).filter(b => b > 0);
   const uniqueBets = [...new Set(allBets)].sort((a, b) => a - b);
 
-  g.winners = [];
-  let awarded = 0;
+  // Build side pots from the distinct contribution levels. Each layer spans
+  // (prev, cap]; every player contributes min(totalBet, cap) - prev to it, and
+  // only non-folded players who reached `cap` are eligible to win that layer.
+  const wonByPlayer = new Map(); // player.id -> { player, amount, hand }
+  let prev = 0;
 
   for (const cap of uniqueBets) {
     let potSlice = 0;
     for (const p of g.players) {
-      const contribution = Math.min(p.totalBet, cap) - (awarded > 0 ? Math.min(p.totalBet, uniqueBets[uniqueBets.indexOf(cap) - 1] || 0) : 0);
-      potSlice += Math.max(0, contribution);
+      potSlice += Math.max(0, Math.min(p.totalBet, cap) - prev);
     }
+    prev = cap;
     if (potSlice <= 0) continue;
 
     const eligible = evals.filter(e => e.player.totalBet >= cap);
@@ -310,11 +313,20 @@ function resolveShowdown(game) {
     const tiedWinners = eligible.filter(e => e.eval.rank === bestRank && e.eval.kickers.join(',') === bestKickers);
 
     const share = Math.floor(potSlice / tiedWinners.length);
+    let remainder = potSlice - share * tiedWinners.length; // odd chips
     for (const w of tiedWinners) {
-      w.player.chips += share;
-      g.winners.push({ player: w.player, amount: share, hand: w.eval.name });
-      g.log.push({ type: 'win', player: w.player.name, amount: share, hand: w.eval.name });
+      const amt = share + (remainder-- > 0 ? 1 : 0);
+      w.player.chips += amt;
+      const cur = wonByPlayer.get(w.player.id);
+      if (cur) cur.amount += amt;
+      else wonByPlayer.set(w.player.id, { player: w.player, amount: amt, hand: w.eval.name });
     }
+  }
+
+  // One winner entry + one log line per player (summed across side pots).
+  g.winners = [...wonByPlayer.values()];
+  for (const win of g.winners) {
+    g.log.push({ type: 'win', player: win.player.name, amount: win.amount, hand: win.hand });
   }
 
   g.pot = 0;
