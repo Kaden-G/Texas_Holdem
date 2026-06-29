@@ -1,21 +1,29 @@
 import { evaluateHand, HAND_RANKS } from './hand-eval.js';
 
-// 50 bold cow-poke handles for the non-human players. One is drawn per AI seat.
-const AI_NAMES = [
-  'Rattlesnake Pete', 'Black Jack Mahoney', 'Dead-Eye Dawson', 'Cactus Joe',
-  'Whiskey Bill', 'Iron Belle', 'Calamity Sue', 'Doc Holloway',
-  'Preacher Quaid', 'Buckshot Riley', 'Diamondback Dan', 'Sundown Slade',
-  'Gunsmoke Gracie', 'One-Eyed Cole', 'Mad Dog Morgan', 'Stagecoach Mary',
-  'Lefty Malone', 'Ace McGraw', 'Six-Gun Sallie', 'Comanche Kate',
-  'Tombstone Tate', 'Wild Bill Hawkins', 'Reno Kid', 'Dakota Rose',
-  'Snake-Bite Sawyer', 'Colt Jackson', 'Bronco Burns', 'Faro Frank',
-  'Lucky Luke Dempsey', 'Dusty Granger', 'Hangtree Harlan', 'Apache Annie',
-  'Coyote Cassidy', 'Gambler Gus', 'Iron Tom Bricks', 'Silver Dollar Sam',
-  'Texas Red', 'Bloody Bob Vance', 'Lonesome Levi', 'Pistol Pearl',
-  'Banjo Briggs', 'Rusty Calhoun', 'Maverick Doyle', 'Cinch Carter',
-  'Outlaw Odell', 'Vinegar Joe', 'Quickdraw Quinn', 'Powder Keg Pruitt',
-  "Ramblin' Cy", 'High-Card Holt',
-];
+// Bold cow-poke handles for the non-human players, split by gender so an AI's
+// name matches the gender of the portrait it's dealt.
+const AI_NAMES = {
+  m: [
+    'Rattlesnake Pete', 'Black Jack Mahoney', 'Dead-Eye Dawson', 'Cactus Joe',
+    'Whiskey Bill', 'Doc Holloway', 'Preacher Quaid', 'Buckshot Riley',
+    'Diamondback Dan', 'Sundown Slade', 'One-Eyed Cole', 'Mad Dog Morgan',
+    'Lefty Malone', 'Ace McGraw', 'Tombstone Tate', 'Wild Bill Hawkins',
+    'Reno Kid', 'Snake-Bite Sawyer', 'Colt Jackson', 'Bronco Burns',
+    'Faro Frank', 'Lucky Luke Dempsey', 'Dusty Granger', 'Hangtree Harlan',
+    'Coyote Cassidy', 'Gambler Gus', 'Iron Tom Bricks', 'Silver Dollar Sam',
+    'Texas Red', 'Bloody Bob Vance', 'Lonesome Levi', 'Banjo Briggs',
+    'Rusty Calhoun', 'Maverick Doyle', 'Cinch Carter', 'Outlaw Odell',
+    'Vinegar Joe', 'Quickdraw Quinn', 'Powder Keg Pruitt', "Ramblin' Cy",
+    'High-Card Holt',
+  ],
+  f: [
+    'Iron Belle', 'Calamity Sue', 'Gunsmoke Gracie', 'Stagecoach Mary',
+    'Six-Gun Sallie', 'Comanche Kate', 'Dakota Rose', 'Apache Annie',
+    'Pistol Pearl', 'Sharpshooter Sadie', 'Deadwood Dot', 'Outlaw Opal',
+    'Lola Vasquez', 'Cherokee Jane', 'Ruby Vane', 'Whiskey Winnie',
+    'Gold-Tooth Greta', 'Dynamite Dolly',
+  ],
+};
 
 // Playing-style archetypes; each chosen AI gets one (with a little jitter).
 const STYLES = [
@@ -27,13 +35,23 @@ const STYLES = [
 
 const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
 const jitter = mag => (Math.random() * 2 - 1) * mag;
+const shuffle = arr => [...arr].sort(() => Math.random() - 0.5);
 
-export function getAIPersonalities(count) {
-  const names = [...AI_NAMES].sort(() => Math.random() - 0.5).slice(0, count);
-  return names.map(name => {
+// `genders` is an array of 'm'/'f', one per AI seat (from the dealt portraits).
+// Returns a personality per seat whose name matches that seat's gender.
+export function getAIPersonalities(genders) {
+  // Back-compat: a number means "this many AIs" with random genders.
+  if (typeof genders === 'number') {
+    genders = Array.from({ length: genders }, () => (Math.random() < 0.5 ? 'm' : 'f'));
+  }
+  const pools = { m: shuffle(AI_NAMES.m), f: shuffle(AI_NAMES.f) };
+  return genders.map(g => {
+    const pool = pools[g]?.length ? pools[g] : pools[g === 'm' ? 'f' : 'm'];
+    const name = pool.length ? pool.shift() : 'The Stranger';
     const base = STYLES[Math.floor(Math.random() * STYLES.length)];
     return {
       name,
+      gender: g,
       style: base.style,
       aggression: clamp(base.aggression + jitter(0.1), 0.15, 0.9),
       bluff: clamp(base.bluff + jitter(0.05), 0.03, 0.35),

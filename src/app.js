@@ -96,12 +96,13 @@ function wireAvatarGallery(container, onPick) {
 
 window.startGame = () => {
   const name = ($('player-name')?.value || 'Stranger').trim() || 'Stranger';
-  const aiPersonalities = getAIPersonalities(setupAICount);
+  // Deal portraits first, then draw a same-gender handle for each AI seat.
   const aiAvatars = pickRandomAvatars(setupAICount, [setupAvatarId]);
+  const aiPersonalities = getAIPersonalities(aiAvatars.map(a => a.gender));
   const players = [
     { name, isAI: false, avatar: setupAvatarId },
-    ...aiPersonalities.map((p, i) => ({
-      name: p.name, isAI: true, personality: p, avatar: aiAvatars[i]?.id || null,
+    ...aiAvatars.map((av, i) => ({
+      name: aiPersonalities[i].name, isAI: true, personality: aiPersonalities[i], avatar: av.id,
     })),
   ];
   G = createGame(players);
