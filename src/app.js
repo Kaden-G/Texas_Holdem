@@ -333,7 +333,7 @@ function checkAITurn() {
       } else {
         checkAITurn();
       }
-    }, 600 + Math.random() * 800);
+    }, 4500 + Math.random() * 1000);
   }
 }
 
