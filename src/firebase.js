@@ -38,7 +38,7 @@ function genCode() {
   return code;
 }
 
-export async function createRoom(playerName) {
+export async function createRoom(playerName, avatar = null) {
   initFirebase();
   const code = genCode();
   roomRef = db.ref('poker_rooms/' + code);
@@ -47,7 +47,7 @@ export async function createRoom(playerName) {
     created: Date.now(),
     started: false,
     players: {
-      [clientId]: { name: playerName, ready: false, seat: 0 }
+      [clientId]: { name: playerName, avatar, ready: false, seat: 0 }
     },
     state: null,
   };
@@ -55,7 +55,7 @@ export async function createRoom(playerName) {
   return code;
 }
 
-export async function joinRoom(code, playerName) {
+export async function joinRoom(code, playerName, avatar = null) {
   initFirebase();
   roomRef = db.ref('poker_rooms/' + code);
   const snap = await roomRef.once('value');
@@ -66,6 +66,7 @@ export async function joinRoom(code, playerName) {
   if (playerCount >= 6) throw new Error('Room is full');
   await roomRef.child('players/' + clientId).set({
     name: playerName,
+    avatar,
     ready: false,
     seat: playerCount,
   });

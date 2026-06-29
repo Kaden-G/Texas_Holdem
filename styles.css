@@ -822,3 +822,60 @@ body {
   .btn { font-size: 13px; padding: 10px 20px; }
   .btn-allin { font-size: 12px; }
 }
+
+/* ── Character avatars ── */
+.avatar {
+  display: inline-block;
+  object-fit: cover;
+  border-radius: 50%;
+  background: var(--saloon-dark);
+  border: 2px solid var(--saloon-brass);
+  box-shadow: 0 2px 6px rgba(0,0,0,0.5);
+  vertical-align: middle;
+}
+.avatar-empty {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+}
+.avatar-sm   { width: 32px;  height: 32px;  font-size: 18px; }
+.avatar-md   { width: 64px;  height: 64px;  font-size: 32px; }
+.avatar-seat { width: 56px;  height: 56px;  font-size: 28px; }
+
+/* Avatar picker gallery (setup + lobby) */
+.setup-row-avatars { align-items: flex-start; }
+.avatar-gallery {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: center;
+  max-width: 360px;
+}
+.avatar-choice {
+  padding: 3px;
+  border: 2px solid transparent;
+  border-radius: 50%;
+  background: none;
+  cursor: pointer;
+  line-height: 0;
+  transition: transform 0.12s, border-color 0.12s;
+}
+.avatar-choice:hover { transform: translateY(-2px); }
+.avatar-choice.selected {
+  border-color: var(--saloon-gold-bright);
+  box-shadow: 0 0 10px rgba(230,198,90,0.5);
+}
+.avatar-choice .avatar { border-color: var(--saloon-wood-light); }
+.avatar-choice.selected .avatar { border-color: var(--saloon-gold-bright); }
+
+/* Seat avatar */
+.player-avatar-wrap {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 6px;
+}
+
+/* Lobby row layout with avatar */
+.lobby-player { gap: 10px; }
+.lobby-player-name { flex: 1; text-align: left; }

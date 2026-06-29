@@ -19,6 +19,7 @@ export function createGame(players) {
       allIn: false,
       isAI: p.isAI,
       personality: p.personality || null,
+      avatar: p.avatar || null,
       seatIndex: i,
     })),
     communityCards: [],

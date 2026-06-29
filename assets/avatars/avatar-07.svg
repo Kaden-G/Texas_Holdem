@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256" role="img" aria-label="Placeholder avatar 7">
+  <rect width="256" height="256" fill="#1a120b"/>
+  <circle cx="128" cy="128" r="104" fill="#2e6a7a"/>
+  <circle cx="128" cy="128" r="104" fill="none" stroke="#e8d8b0" stroke-width="6" opacity="0.5"/>
+  <text x="128" y="120" font-family="Georgia, 'Times New Roman', serif" font-size="92" fill="#f5ecd6" text-anchor="middle" dominant-baseline="middle">♦</text>
+  <text x="128" y="196" font-family="Georgia, serif" font-size="34" fill="#f5ecd6" text-anchor="middle" dominant-baseline="middle" opacity="0.85">#7</text>
+</svg>

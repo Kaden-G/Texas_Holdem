@@ -2,6 +2,7 @@ import { createDeck, shuffleDeck, cardId, isRed, SUITS, RANKS } from './cards.js
 import { evaluateHand, HAND_NAMES, HAND_RANKS } from './hand-eval.js';
 import { createGame, startHand, applyAction, getValidActions, isHandOver, isGameOver, getGameWinner, PHASES, BIG_BLIND } from './engine.js';
 import { getAIPersonalities, aiDecision } from './ai.js';
+import { AVATARS, avatarMarkup, pickRandomAvatars } from './avatars.js';
 import { initFirebase, createRoom, joinRoom, listenRoom, stopListening, setReady, pushGameState, startOnlineGame, pushAction, clearAction, getClientId, isHost } from './firebase.js';
 
 let G = null;
@@ -33,6 +34,7 @@ window.showSetup = () => {
 
 // ── SETUP (single player) ──
 let setupAICount = 4;
+let setupAvatarId = AVATARS[0].id;
 
 function renderSetup() {
   const grid = $('setup-grid');
@@ -59,14 +61,48 @@ function renderSetup() {
     <input type="text" id="player-name" class="setup-input" value="Stranger" maxlength="16" placeholder="Enter your name...">
   `;
   grid.appendChild(nameRow);
+
+  const avatarRow = document.createElement('div');
+  avatarRow.className = 'setup-row setup-row-avatars';
+  avatarRow.innerHTML = `
+    <label class="setup-label">YOUR LOOK</label>
+    ${avatarGalleryHtml(setupAvatarId)}
+  `;
+  grid.appendChild(avatarRow);
+  wireAvatarGallery(avatarRow, id => { setupAvatarId = id; });
+}
+
+// Shared avatar picker (setup + online lobby).
+function avatarGalleryHtml(selectedId) {
+  return `<div class="avatar-gallery">
+    ${AVATARS.map(a => `
+      <button type="button" class="avatar-choice ${a.id === selectedId ? 'selected' : ''}" data-avatar="${a.id}" title="${a.label}">
+        ${avatarMarkup(a, 'avatar-md')}
+      </button>`).join('')}
+  </div>`;
+}
+
+function wireAvatarGallery(container, onPick) {
+  const gallery = container.querySelector('.avatar-gallery');
+  if (!gallery) return;
+  gallery.addEventListener('click', e => {
+    const btn = e.target.closest('.avatar-choice');
+    if (!btn) return;
+    onPick(btn.dataset.avatar);
+    gallery.querySelectorAll('.avatar-choice').forEach(b =>
+      b.classList.toggle('selected', b === btn));
+  });
 }
 
 window.startGame = () => {
   const name = ($('player-name')?.value || 'Stranger').trim() || 'Stranger';
   const aiPersonalities = getAIPersonalities(setupAICount);
+  const aiAvatars = pickRandomAvatars(setupAICount, [setupAvatarId]);
   const players = [
-    { name, isAI: false },
-    ...aiPersonalities.map(p => ({ name: p.name, isAI: true, personality: p })),
+    { name, isAI: false, avatar: setupAvatarId },
+    ...aiPersonalities.map((p, i) => ({
+      name: p.name, isAI: true, personality: p, avatar: aiAvatars[i]?.id || null,
+    })),
   ];
   G = createGame(players);
   isOnline = false;
@@ -90,6 +126,10 @@ function renderLobbyMenu() {
         <label class="setup-label">YOUR NAME</label>
         <input type="text" id="online-name" class="setup-input" value="Stranger" maxlength="16">
       </div>
+      <div class="lobby-row setup-row-avatars">
+        <label class="setup-label">YOUR LOOK</label>
+        ${avatarGalleryHtml(setupAvatarId)}
+      </div>
       <div class="lobby-buttons">
         <button class="btn btn-primary" onclick="window.hostGame()">🏠 HOST GAME</button>
         <button class="btn btn-secondary" onclick="window.showJoin()">🚪 JOIN GAME</button>
@@ -104,6 +144,7 @@ function renderLobbyMenu() {
       </div>
     </div>
   `;
+  wireAvatarGallery(body, id => { setupAvatarId = id; });
 }
 
 window.showJoin = () => {
@@ -113,7 +154,7 @@ window.showJoin = () => {
 window.hostGame = async () => {
   const name = ($('online-name')?.value || 'Stranger').trim() || 'Stranger';
   try {
-    roomCode = await createRoom(name);
+    roomCode = await createRoom(name, setupAvatarId);
     listenRoom(onRoomUpdate);
     renderLobbyRoom();
   } catch (e) {
@@ -127,7 +168,7 @@ window.doJoin = async () => {
   if (code.length !== 4) { alert('Enter a 4-letter room code'); return; }
   try {
     roomCode = code;
-    await joinRoom(code, name);
+    await joinRoom(code, name, setupAvatarId);
     listenRoom(onRoomUpdate);
     renderLobbyRoom();
   } catch (e) {
@@ -149,6 +190,7 @@ function renderLobbyRoom() {
         <div class="lobby-label">PLAYERS AT THE TABLE</div>
         ${playerList.map(([cid, p]) => `
           <div class="lobby-player ${p.ready ? 'ready' : ''}">
+            ${avatarMarkup(p.avatar, 'avatar-sm')}
             <span class="lobby-player-name">${p.name}${cid === rd.host ? ' ★' : ''}</span>
             <span class="lobby-player-status">${p.ready ? '✓ READY' : 'WAITING'}</span>
           </div>
@@ -176,6 +218,7 @@ window.launchOnline = async () => {
   const players = entries.map(([cid, p], i) => ({
     name: p.name,
     isAI: false,
+    avatar: p.avatar || null,
     clientId: cid,
     seatIndex: i,
   }));
@@ -403,6 +446,7 @@ function renderPlayers() {
     const winBadge = winnerInfo ? `<div class="win-badge">WON $${winnerInfo.amount}</div>` : '';
 
     seat.innerHTML = `
+      <div class="player-avatar-wrap">${avatarMarkup(p.avatar, 'avatar-seat')}</div>
       <div class="player-info">
         <div class="player-name">${p.name} ${dealerMark}</div>
         <div class="player-chips">$${p.chips}${p.allIn ? ' ALL IN' : ''}</div>
