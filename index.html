@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>DEAD HAND SALOON — Texas Hold'em</title>
-<link rel="stylesheet" href="styles.css?v=4">
+<link rel="stylesheet" href="styles.css?v=5">
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
 </head>
@@ -17,13 +17,15 @@
     <h1>DEAD HAND</h1>
     <div class="sign-subtitle">SALOON</div>
   </div>
-  <div class="ornament">⬥ ⬥ ⬥</div>
-  <div class="title-flavor">
-    "Every man's got a price. Yours is the next card off the deck."
+  <div class="title-bottom">
+    <div class="ornament">⬥ ⬥ ⬥</div>
+    <div class="title-flavor">
+      "Every man's got a price. Yours is the next card off the deck."
+    </div>
+    <div class="title-info">Texas Hold'em Poker · 2–6 Players</div>
+    <button class="btn btn-primary" onclick="window.showSetup()">🃏 SIT DOWN</button>
+    <button class="btn btn-secondary" style="margin-top:12px;" onclick="window.goOnline()">🌐 ONLINE TABLE</button>
   </div>
-  <div class="title-info">Texas Hold'em Poker · 2–6 Players</div>
-  <button class="btn btn-primary" onclick="window.showSetup()">🃏 SIT DOWN</button>
-  <button class="btn btn-secondary" style="margin-top:12px;" onclick="window.goOnline()">🌐 ONLINE TABLE</button>
 </div>
 
 <!-- LOBBY -->
@@ -100,6 +102,6 @@
   </div>
 </div>
 
-<script type="module" src="src/app.js?v=4"></script>
+<script type="module" src="src/app.js?v=5"></script>
 </body>
 </html>

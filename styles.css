@@ -45,10 +45,11 @@ body {
 
 /* ── TITLE SCREEN ── */
 #title-screen {
-  justify-content: center;
+  justify-content: space-between;
+  padding: 42px 20px 54px;
   background-color: var(--saloon-dark);
   background-image:
-    linear-gradient(180deg, rgba(12,7,4,0.62) 0%, rgba(12,7,4,0.30) 42%, rgba(12,7,4,0.80) 100%),
+    linear-gradient(180deg, rgba(12,7,4,0.66) 0%, rgba(12,7,4,0.28) 40%, rgba(12,7,4,0.85) 100%),
     url('assets/ui/title-bg.jpg');
   background-size: cover, cover;
   background-position: center, center;
@@ -57,8 +58,18 @@ body {
 
 .saloon-sign {
   position: relative;
-  padding: 30px 60px;
-  margin-bottom: 10px;
+  padding: 22px 56px;
+  margin: 0 auto;
+  background: rgba(14,8,4,0.55);
+  border-radius: 6px;
+  -webkit-backdrop-filter: blur(2px);
+  backdrop-filter: blur(2px);
+}
+
+.title-bottom {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
 }
 
 .saloon-sign h1 {
@@ -80,7 +91,8 @@ body {
   text-align: center;
   letter-spacing: 4px;
   margin-top: 4px;
-  opacity: 0.7;
+  opacity: 0.92;
+  text-shadow: 0 2px 5px rgba(0,0,0,0.9);
 }
 
 .sign-border {
@@ -100,28 +112,33 @@ body {
 
 .title-flavor {
   font-family: 'IM Fell English SC', serif;
-  font-size: clamp(14px, 2.5vw,18px);
-  color: var(--text-dim);
+  font-size: clamp(16px, 2.6vw,20px);
+  color: var(--saloon-cream);
   text-align: center;
-  max-width: 500px;
-  margin: 16px 0 30px;
+  max-width: 560px;
+  margin: 14px 0 26px;
   font-style: italic;
   line-height: 1.6;
+  text-shadow: 0 2px 6px rgba(0,0,0,0.95), 0 0 3px rgba(0,0,0,0.9);
 }
 
 .title-info {
-  font-size: 15px;
-  color: var(--text-dim);
+  font-family: 'Rye', cursive;
+  font-size: 17px;
+  letter-spacing: 1px;
+  color: var(--saloon-gold-bright);
   margin-bottom: 20px;
   text-align: center;
+  text-shadow: 0 2px 5px rgba(0,0,0,0.95);
 }
 
 .ornament {
-  color: var(--saloon-gold);
+  color: var(--saloon-gold-bright);
   font-size: 26px;
   letter-spacing: 12px;
   margin: 8px 0;
-  opacity: 0.5;
+  opacity: 0.85;
+  text-shadow: 0 2px 5px rgba(0,0,0,0.9);
 }
 
 /* ── BUTTONS ── */
@@ -834,17 +851,17 @@ body {
 }
 .hr-name {
   font-family: 'IM Fell English SC', serif;
-  font-size: 15px;
+  font-size: 17px;
   color: var(--saloon-cream);
 }
 .hr-name::before {
   counter-increment: hr;
   content: counter(hr) ". ";
   color: var(--saloon-gold);
-  font-size: 12px;
+  font-size: 14px;
 }
 .hr-ex {
-  font-size: 13px;
+  font-size: 15px;
   color: var(--text-dim);
   white-space: nowrap;
   letter-spacing: 1px;
@@ -853,14 +870,14 @@ body {
 
 .log-label {
   font-family: 'Rye', cursive;
-  font-size: 13px;
+  font-size: 15px;
   color: var(--saloon-gold);
   letter-spacing: 2px;
   margin-bottom: 4px;
 }
 
 #game-log {
-  font-size: 14px;
+  font-size: 16px;
   line-height: 1.6;
 }
 
@@ -870,7 +887,7 @@ body {
 
 .log-blind { color: var(--text-dim); }
 .log-action { color: var(--saloon-cream); }
-.log-phase { color: var(--saloon-gold); font-family: 'Rye', cursive; font-size: 13px; letter-spacing: 2px; }
+.log-phase { color: var(--saloon-gold); font-family: 'Rye', cursive; font-size: 15px; letter-spacing: 2px; }
 .log-win { color: var(--saloon-gold-bright); font-weight: 700; }
 .log-system { color: var(--text-dim); font-style: italic; }
 
