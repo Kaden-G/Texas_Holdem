@@ -14,11 +14,12 @@ const DECK_NAMES = [
   'The High Roller',      // 06 — emerald & gold filigree
   'The Outrider',         // 07 — horseback rider medallions
   'The House Deck',       // 08 — gold monogram sunburst
-  "Walter's Pick",        // 09 — ravens (the "Seahawk")
+  'The Murder',           // 09 — ravens
   'The Randall Special',  // 10 — grim reaper
   "Kaden's Classic",      // 11 — Día de los Muertos mariachi skeleton
   'Tall Timbers',         // 12 — lone rider among the redwoods
   'Frontier Map',         // 13 — old parchment territory map
+  "Walter's Pick",        // 14 — seahawk / hawk crest
 ];
 
 export const DECKS = DECK_NAMES.map((name, i) => {
