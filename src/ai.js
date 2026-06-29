@@ -1,19 +1,44 @@
 import { evaluateHand, HAND_RANKS } from './hand-eval.js';
 
-const PERSONALITIES = [
-  { name: 'Slim', style: 'tight', aggression: 0.3, bluff: 0.08 },
-  { name: 'Rattlesnake', style: 'aggressive', aggression: 0.7, bluff: 0.2 },
-  { name: 'Doc', style: 'calculated', aggression: 0.5, bluff: 0.12 },
-  { name: 'Calamity', style: 'loose', aggression: 0.6, bluff: 0.25 },
-  { name: 'Preacher', style: 'tight', aggression: 0.35, bluff: 0.05 },
-  { name: 'Whiskey Pete', style: 'loose', aggression: 0.55, bluff: 0.3 },
-  { name: 'Iron Belle', style: 'aggressive', aggression: 0.65, bluff: 0.15 },
-  { name: 'The Kid', style: 'calculated', aggression: 0.45, bluff: 0.1 },
+// 50 bold cow-poke handles for the non-human players. One is drawn per AI seat.
+const AI_NAMES = [
+  'Rattlesnake Pete', 'Black Jack Mahoney', 'Dead-Eye Dawson', 'Cactus Joe',
+  'Whiskey Bill', 'Iron Belle', 'Calamity Sue', 'Doc Holloway',
+  'Preacher Quaid', 'Buckshot Riley', 'Diamondback Dan', 'Sundown Slade',
+  'Gunsmoke Gracie', 'One-Eyed Cole', 'Mad Dog Morgan', 'Stagecoach Mary',
+  'Lefty Malone', 'Ace McGraw', 'Six-Gun Sallie', 'Comanche Kate',
+  'Tombstone Tate', 'Wild Bill Hawkins', 'Reno Kid', 'Dakota Rose',
+  'Snake-Bite Sawyer', 'Colt Jackson', 'Bronco Burns', 'Faro Frank',
+  'Lucky Luke Dempsey', 'Dusty Granger', 'Hangtree Harlan', 'Apache Annie',
+  'Coyote Cassidy', 'Gambler Gus', 'Iron Tom Bricks', 'Silver Dollar Sam',
+  'Texas Red', 'Bloody Bob Vance', 'Lonesome Levi', 'Pistol Pearl',
+  'Banjo Briggs', 'Rusty Calhoun', 'Maverick Doyle', 'Cinch Carter',
+  'Outlaw Odell', 'Vinegar Joe', 'Quickdraw Quinn', 'Powder Keg Pruitt',
+  "Ramblin' Cy", 'High-Card Holt',
 ];
 
+// Playing-style archetypes; each chosen AI gets one (with a little jitter).
+const STYLES = [
+  { style: 'tight',      aggression: 0.30, bluff: 0.07 },
+  { style: 'aggressive', aggression: 0.70, bluff: 0.20 },
+  { style: 'calculated', aggression: 0.50, bluff: 0.12 },
+  { style: 'loose',      aggression: 0.60, bluff: 0.28 },
+];
+
+const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+const jitter = mag => (Math.random() * 2 - 1) * mag;
+
 export function getAIPersonalities(count) {
-  const shuffled = [...PERSONALITIES].sort(() => Math.random() - 0.5);
-  return shuffled.slice(0, count);
+  const names = [...AI_NAMES].sort(() => Math.random() - 0.5).slice(0, count);
+  return names.map(name => {
+    const base = STYLES[Math.floor(Math.random() * STYLES.length)];
+    return {
+      name,
+      style: base.style,
+      aggression: clamp(base.aggression + jitter(0.1), 0.15, 0.9),
+      bluff: clamp(base.bluff + jitter(0.05), 0.03, 0.35),
+    };
+  });
 }
 
 export function aiDecision(player, gameState) {

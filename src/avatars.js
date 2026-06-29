@@ -9,11 +9,26 @@ export const AVATAR_COUNT = 11;
 // File extensions tried, in order. Real photos win; .svg placeholder is last.
 export const AVATAR_EXTS = ['png', 'jpg', 'jpeg', 'webp', 'svg'];
 
+// In-game names for each portrait (avatar-01 … avatar-11).
+const AVATAR_NAMES = [
+  'Silas Graves',         // 01 — grizzled elder, handlebar mustache
+  'Cole Braddock',        // 02 — bearded outlaw in a dark coat
+  'Diego Reyes',          // 03 — young vaquero in suspenders
+  'Marshal Reed',         // 04 — stoic lawman
+  'Boone Hartley',        // 05 — weathered old trail hand
+  'Eli Two-Hawk',         // 06 — braided plainsman
+  'Belle Sawyer',         // 07 — blonde, hard-bitten gunhand
+  'Harriet Stone',        // 08 — strong-jawed homesteader
+  'Rosa Delgado',         // 09 — dark hair, red kerchief
+  'Winona Grey-Cloud',    // 10 — braided, teal scarf
+  'Miss Adelaide Crowe',  // 11 — stern widow in black
+];
+
 export const AVATARS = Array.from({ length: AVATAR_COUNT }, (_, i) => {
   const n = String(i + 1).padStart(2, '0');
   return {
     id: `avatar-${n}`,
-    label: `Stranger ${i + 1}`,      // edit to give avatars in-game names
+    label: AVATAR_NAMES[i] || `Stranger ${i + 1}`,
     base: `${AVATAR_DIR}/avatar-${n}`,
   };
 });
