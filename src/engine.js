@@ -6,6 +6,23 @@ export const SMALL_BLIND = 10;
 export const BIG_BLIND = 20;
 export const STARTING_CHIPS = 1000;
 
+// Escalating blind schedule. Each level lasts LEVEL_SECONDS of real time; by the
+// later levels the blinds dwarf the stacks, forcing all-ins so a game finishes
+// in roughly 10–15 minutes instead of grinding forever.
+export const LEVEL_SECONDS = 100;
+export const BLIND_LEVELS = [
+  { sb: 10,   bb: 20 },
+  { sb: 20,   bb: 40 },
+  { sb: 40,   bb: 80 },
+  { sb: 75,   bb: 150 },
+  { sb: 125,  bb: 250 },
+  { sb: 200,  bb: 400 },
+  { sb: 300,  bb: 600 },
+  { sb: 500,  bb: 1000 },
+  { sb: 800,  bb: 1600 },
+  { sb: 1500, bb: 3000 },
+];
+
 export function createGame(players) {
   return {
     players: players.map((p, i) => ({
@@ -31,6 +48,9 @@ export function createGame(players) {
     activeIndex: -1,
     currentBet: 0,
     minRaise: BIG_BLIND,
+    smallBlind: SMALL_BLIND,
+    bigBlind: BIG_BLIND,
+    level: 0,
     lastRaiser: -1,
     roundNum: 0,
     log: [],
@@ -46,7 +66,9 @@ export function startHand(game) {
   g.pot = 0;
   g.sidePots = [];
   g.currentBet = 0;
-  g.minRaise = BIG_BLIND;
+  const SB = g.smallBlind || SMALL_BLIND;
+  const BB = g.bigBlind || BIG_BLIND;
+  g.minRaise = BB;
   g.lastRaiser = -1;
   g.winners = null;
   g.log = [];
@@ -69,7 +91,7 @@ export function startHand(game) {
   const sbIndex = alive.length === 2 ? g.dealerIndex : nextAlive(g, g.dealerIndex);
   const bbIndex = nextAlive(g, sbIndex);
 
-  const sbAmount = Math.min(SMALL_BLIND, g.players[sbIndex].chips);
+  const sbAmount = Math.min(SB, g.players[sbIndex].chips);
   g.players[sbIndex].chips -= sbAmount;
   g.players[sbIndex].currentBet = sbAmount;
   g.players[sbIndex].totalBet = sbAmount;
@@ -77,13 +99,13 @@ export function startHand(game) {
   if (g.players[sbIndex].chips === 0) g.players[sbIndex].allIn = true;
   g.log.push({ type: 'blind', player: g.players[sbIndex].name, amount: sbAmount, kind: 'small' });
 
-  const bbAmount = Math.min(BIG_BLIND, g.players[bbIndex].chips);
+  const bbAmount = Math.min(BB, g.players[bbIndex].chips);
   g.players[bbIndex].chips -= bbAmount;
   g.players[bbIndex].currentBet = bbAmount;
   g.players[bbIndex].totalBet = bbAmount;
   g.pot += bbAmount;
   if (g.players[bbIndex].chips === 0) g.players[bbIndex].allIn = true;
-  g.currentBet = BIG_BLIND;
+  g.currentBet = BB;
   g.log.push({ type: 'blind', player: g.players[bbIndex].name, amount: bbAmount, kind: 'big' });
 
   for (const p of g.players) {
@@ -96,6 +118,13 @@ export function startHand(game) {
   g.activeIndex = nextAlive(g, bbIndex);
   g.lastRaiser = -1;
   g.actedThisRound = {};
+
+  // If posting the (now large) blinds already put everyone all-in, nobody can
+  // act — deal the rest of the board and go straight to showdown.
+  if (g.players.filter(p => !p.folded && canAct(p)).length === 0) {
+    const notFolded = g.players.filter(p => !p.folded);
+    return notFolded.length <= 1 ? resolveWinner(g) : advancePhase(g);
+  }
 
   return g;
 }
@@ -123,7 +152,14 @@ export function applyAction(game, action) {
   const player = g.players[g.activeIndex];
 
   if (!canAct(player)) {
-    g.activeIndex = nextAlive(g, g.activeIndex);
+    // This player can't act. If nobody else can either, the betting is done —
+    // run it out instead of spinning forever past all-in players.
+    const nextIdx = findNextToAct(g);
+    if (nextIdx === -1) {
+      const notFolded = g.players.filter(p => !p.folded);
+      return notFolded.length <= 1 ? resolveWinner(g) : advancePhase(g);
+    }
+    g.activeIndex = nextIdx;
     return g;
   }
 
@@ -219,7 +255,7 @@ function advancePhase(game) {
 
   g.players.forEach(p => { p.currentBet = 0; });
   g.currentBet = 0;
-  g.minRaise = BIG_BLIND;
+  g.minRaise = g.bigBlind || BIG_BLIND;
   g.lastRaiser = -1;
   g.actedThisRound = {};
 
@@ -279,6 +315,20 @@ function resolveWinner(game) {
 
 function resolveShowdown(game) {
   const g = { ...game };
+
+  // Return any uncalled bet: you can't win more than the next-highest
+  // contribution, so refund the top bettor's excess before building side pots.
+  const sortedBets = g.players.map(p => p.totalBet).sort((a, b) => b - a);
+  const h1 = sortedBets[0] || 0;
+  const h2 = sortedBets[1] || 0;
+  if (h1 > h2) {
+    const top = g.players.find(p => p.totalBet === h1);
+    const refund = h1 - h2;
+    top.chips += refund;
+    top.totalBet -= refund;
+    g.pot -= refund;
+  }
+
   const contenders = g.players.filter(p => !p.folded);
 
   const evals = contenders.map(p => ({

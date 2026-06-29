@@ -1,6 +1,6 @@
 import { createDeck, shuffleDeck, cardId, isRed, SUITS, RANKS } from './cards.js';
 import { evaluateHand, HAND_NAMES, HAND_RANKS } from './hand-eval.js';
-import { createGame, startHand, applyAction, getValidActions, isHandOver, isGameOver, getGameWinner, PHASES, BIG_BLIND, STARTING_CHIPS } from './engine.js';
+import { createGame, startHand, applyAction, getValidActions, isHandOver, isGameOver, getGameWinner, PHASES, BIG_BLIND, STARTING_CHIPS, BLIND_LEVELS, LEVEL_SECONDS } from './engine.js';
 import { getAIPersonalities, aiDecision } from './ai.js';
 import { AVATARS, avatarMarkup, pickRandomAvatars } from './avatars.js';
 import { DECKS, deckById } from './decks.js';
@@ -17,6 +17,8 @@ let pendingReveal = false;
 let revealTimer = null;
 let aiTimer = null;
 let scored = false; // guard so a game's result is recorded to the boards once
+let gameStart = 0;  // wall-clock start of the current game (for blind escalation)
+let blindLevel = 0;
 
 // ── DOM helpers ──
 const $ = id => document.getElementById(id);
@@ -175,6 +177,8 @@ window.startGame = () => {
   G = createGame(players);
   isOnline = false;
   scored = false;
+  gameStart = Date.now();
+  blindLevel = 0;
   setDeckBack(setupDeckId);
   switchScreen('game-screen');
   beginHand();
@@ -300,6 +304,8 @@ window.launchOnline = async () => {
   G = createGame(players);
   G.clientMap = {};
   entries.forEach(([cid], i) => { G.clientMap[cid] = i; });
+  gameStart = Date.now();
+  blindLevel = 0;
   G = startHand(G);
   isOnline = true;
   scored = false;
@@ -342,12 +348,27 @@ function onRoomUpdate(data) {
   }
 }
 
+// Raise the blinds based on how long the game has been running.
+function applyBlindLevel() {
+  const elapsed = (Date.now() - gameStart) / 1000;
+  const lvl = Math.min(BLIND_LEVELS.length - 1, Math.floor(elapsed / LEVEL_SECONDS));
+  const level = BLIND_LEVELS[lvl];
+  const raised = lvl > blindLevel;
+  blindLevel = lvl;
+  G.level = lvl;
+  G.smallBlind = level.sb;
+  G.bigBlind = level.bb;
+  return raised;
+}
+
 // ── GAME FLOW ──
 function beginHand() {
+  const raised = applyBlindLevel();
   G = startHand(G);
   pendingReveal = false;
   renderGame();
   logMsg(`─── Hand #${G.roundNum} ───`);
+  if (raised) logMsg(`Blinds up: $${G.smallBlind} / $${G.bigBlind}`);
   setTimeout(() => checkAITurn(), 400);
 }
 
@@ -588,7 +609,7 @@ function renderPlayers() {
 function renderPot() {
   $('pot-display').textContent = `POT: $${G.pot}`;
   const phase = G.phase === 'showdown' ? 'SHOWDOWN' : G.phase.toUpperCase();
-  $('phase-display').textContent = `${phase} · HAND #${G.roundNum}`;
+  $('phase-display').textContent = `${phase} · HAND #${G.roundNum} · BLINDS $${G.smallBlind}/$${G.bigBlind}`;
 
   const pile = $('pot-pile');
   if (pile) {
@@ -661,7 +682,7 @@ function renderActions() {
         <button class="btn-chip" data-set="${maxTotal}" ${da}>MAX</button>
       </div>
       <div class="raise-row">
-        <input type="range" id="raise-slider" class="raise-slider" min="${minTotal}" max="${maxTotal}" value="${minTotal}" step="${BIG_BLIND}" ${da}>
+        <input type="range" id="raise-slider" class="raise-slider" min="${minTotal}" max="${maxTotal}" value="${minTotal}" step="${G.bigBlind || BIG_BLIND}" ${da}>
         <span class="raise-val" id="raise-val">$${minTotal}</span>
         <button class="btn btn-primary" ${dis ? 'disabled' : 'onclick="window.doRaise()"'}>RAISE</button>
       </div>
