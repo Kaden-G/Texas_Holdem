@@ -634,15 +634,15 @@ body {
 }
 
 .card-small {
-  width: 54px;
-  height: 76px;
+  width: 106px;
+  height: 150px;
 }
-.card-small .card-corner.tl { top: 4px; left: 5px; }
-.card-small .card-corner.br { bottom: 4px; right: 5px; }
-.card-small .cc-rank { font-size: 15px; }
-.card-small .cc-suit { font-size: 11px; }
-.card-small .card-pip { font-size: 34px; }
-.card-small .card-face-letter { font-size: 30px; }
+.card-small .card-corner.tl { top: 8px; left: 9px; }
+.card-small .card-corner.br { bottom: 8px; right: 9px; }
+.card-small .cc-rank { font-size: 28px; }
+.card-small .cc-suit { font-size: 21px; }
+.card-small .card-pip { font-size: 66px; }
+.card-small .card-face-letter { font-size: 58px; }
 
 /* ── PLAYERS ── */
 #players-area {
@@ -1070,7 +1070,7 @@ body {
 }
 .avatar-sm   { width: 32px;  height: 32px;  font-size: 20px; }
 .avatar-md   { width: 64px;  height: 64px;  font-size: 34px; }
-.avatar-seat { width: 56px;  height: 56px;  font-size: 30px; }
+.avatar-seat { width: 110px; height: 110px; font-size: 52px; }
 
 /* Avatar picker gallery (setup + lobby) */
 .setup-row-avatars { align-items: flex-start; }
