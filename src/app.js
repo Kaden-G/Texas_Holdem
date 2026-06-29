@@ -25,6 +25,30 @@ function switchScreen(id) {
   $(id).classList.add('active');
 }
 
+// ── Poker chips ──
+// Break an amount into denominated chips and render as overlapping stacks
+// (top-down pile). `size` is 'sm' (seat bets) or 'lg' (central pot).
+const CHIP_DENOMS = [[500, 'c500'], [100, 'c100'], [25, 'c25'], [5, 'c5'], [1, 'c1']];
+
+function chipPileHtml(amount, size = 'sm') {
+  let rem = Math.max(0, Math.round(amount));
+  const chips = [];
+  for (const [v, cls] of CHIP_DENOMS) {
+    let n = Math.floor(rem / v);
+    rem -= n * v;
+    while (n-- > 0) chips.push(cls);
+  }
+  if (!chips.length) return '';
+  const perStack = 5;
+  const cols = [];
+  for (let i = 0; i < chips.length; i += perStack) cols.push(chips.slice(i, i + perStack));
+  return `<div class="chip-pile chip-${size}">` +
+    cols.map(col => `<span class="chip-stack">` +
+      col.map(c => `<span class="chip ${c}"></span>`).join('') +
+    `</span>`).join('') +
+  `</div>`;
+}
+
 // ── TITLE ──
 window.showTitle = () => switchScreen('title-screen');
 window.showSetup = () => {
@@ -451,7 +475,7 @@ function renderPlayers() {
       <div class="player-info">
         <div class="player-name">${p.name} ${dealerMark}</div>
         <div class="player-chips">$${p.chips}${p.allIn ? ' ALL IN' : ''}</div>
-        ${p.currentBet > 0 ? `<div class="player-bet">Bet: $${p.currentBet}</div>` : ''}
+        ${p.currentBet > 0 ? `<div class="player-bet">${chipPileHtml(p.currentBet, 'sm')}<span class="bet-amt">$${p.currentBet}</span></div>` : ''}
       </div>
       <div class="player-cards">${cardsHtml}</div>
       ${handLabel}
@@ -466,6 +490,13 @@ function renderPot() {
   $('pot-display').textContent = `POT: $${G.pot}`;
   const phase = G.phase === 'showdown' ? 'SHOWDOWN' : G.phase.toUpperCase();
   $('phase-display').textContent = `${phase} · HAND #${G.roundNum}`;
+
+  const pile = $('pot-pile');
+  if (pile) {
+    pile.innerHTML = G.pot > 0
+      ? `${chipPileHtml(G.pot, 'lg')}<div class="pot-amt">POT&nbsp;$${G.pot}</div>`
+      : '';
+  }
 }
 
 function renderActions() {
@@ -524,22 +555,40 @@ function renderActions() {
     const minTotal = G.currentBet + G.minRaise;
     const maxTotal = player.currentBet + player.chips;
 
+    // Quick-bet chips ($50/$100/… increments) so the player isn't nudging the slider.
+    const increments = [50, 100, 150, 250].filter(a => minTotal + a <= maxTotal);
+
     const raiseWrap = document.createElement('div');
     raiseWrap.className = 'raise-controls';
     raiseWrap.innerHTML = `
-      <input type="range" id="raise-slider" class="raise-slider" min="${minTotal}" max="${maxTotal}" value="${minTotal}" step="${BIG_BLIND}">
-      <span class="raise-val" id="raise-val">$${minTotal}</span>
-      <button class="btn btn-primary" onclick="window.doRaise()">RAISE</button>
+      <div class="raise-quick" id="raise-quick">
+        <button class="btn-chip" data-set="${minTotal}">MIN</button>
+        ${increments.map(a => `<button class="btn-chip" data-add="${a}">+$${a}</button>`).join('')}
+        <button class="btn-chip" data-set="${maxTotal}">MAX</button>
+      </div>
+      <div class="raise-row">
+        <input type="range" id="raise-slider" class="raise-slider" min="${minTotal}" max="${maxTotal}" value="${minTotal}" step="${BIG_BLIND}">
+        <span class="raise-val" id="raise-val">$${minTotal}</span>
+        <button class="btn btn-primary" onclick="window.doRaise()">RAISE</button>
+      </div>
     `;
     panel.appendChild(raiseWrap);
 
     setTimeout(() => {
       const slider = $('raise-slider');
-      if (slider) {
-        slider.oninput = () => {
-          $('raise-val').textContent = `$${slider.value}`;
-        };
-      }
+      const quick = $('raise-quick');
+      if (!slider) return;
+      const setVal = v => {
+        slider.value = Math.max(minTotal, Math.min(maxTotal, v));
+        $('raise-val').textContent = `$${slider.value}`;
+      };
+      slider.oninput = () => { $('raise-val').textContent = `$${slider.value}`; };
+      quick.onclick = e => {
+        const btn = e.target.closest('button');
+        if (!btn) return;
+        if (btn.dataset.set != null) setVal(+btn.dataset.set);
+        else if (btn.dataset.add != null) setVal(+slider.value + +btn.dataset.add);
+      };
     }, 0);
   }
 
