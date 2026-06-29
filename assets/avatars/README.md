@@ -6,7 +6,7 @@ random.
 
 ## How to add your photos
 
-Name each file `avatar-01`, `avatar-02`, … through `avatar-11` and use any of
+Name each file `avatar-01`, `avatar-02`, … through `avatar-15` and use any of
 these formats (the game tries them in this order):
 
 ```

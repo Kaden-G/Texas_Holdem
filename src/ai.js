@@ -23,6 +23,12 @@ const AI_NAMES = {
     'Lola Vasquez', 'Cherokee Jane', 'Ruby Vane', 'Whiskey Winnie',
     'Gold-Tooth Greta', 'Dynamite Dolly',
   ],
+  nb: [
+    'Indigo Rivers', 'Sage Ardmore', 'Charlie Quicksilver', 'Jesse Wilder',
+    'Marlowe Rourke', 'Ash Calloway', 'Marion Stark', 'Rory Blackwood',
+    'Wren Tucker', 'Rowan Bly', 'Lane Sutter', 'Frankie Dell',
+    'Quill Magee', 'Shiloh Hart',
+  ],
 };
 
 // Playing-style archetypes; each chosen AI gets one (with a little jitter).
@@ -37,17 +43,23 @@ const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
 const jitter = mag => (Math.random() * 2 - 1) * mag;
 const shuffle = arr => [...arr].sort(() => Math.random() - 0.5);
 
-// `genders` is an array of 'm'/'f', one per AI seat (from the dealt portraits).
-// Returns a personality per seat whose name matches that seat's gender.
+// `genders` is an array of 'm'/'f'/'nb', one per AI seat (from the dealt
+// portraits). Returns a personality per seat whose name matches that gender.
 export function getAIPersonalities(genders) {
   // Back-compat: a number means "this many AIs" with random genders.
   if (typeof genders === 'number') {
-    genders = Array.from({ length: genders }, () => (Math.random() < 0.5 ? 'm' : 'f'));
+    const opts = ['m', 'f', 'nb'];
+    genders = Array.from({ length: genders }, () => opts[Math.floor(Math.random() * opts.length)]);
   }
-  const pools = { m: shuffle(AI_NAMES.m), f: shuffle(AI_NAMES.f) };
+  const pools = { m: shuffle(AI_NAMES.m), f: shuffle(AI_NAMES.f), nb: shuffle(AI_NAMES.nb) };
+  // If a gender's pool runs dry, borrow from any remaining handle.
+  const drawAny = () => {
+    for (const k of ['nb', 'm', 'f']) if (pools[k].length) return pools[k].shift();
+    return 'The Stranger';
+  };
   return genders.map(g => {
-    const pool = pools[g]?.length ? pools[g] : pools[g === 'm' ? 'f' : 'm'];
-    const name = pool.length ? pool.shift() : 'The Stranger';
+    const pool = pools[g];
+    const name = pool && pool.length ? pool.shift() : drawAny();
     const base = STYLES[Math.floor(Math.random() * STYLES.length)];
     return {
       name,

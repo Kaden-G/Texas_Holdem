@@ -4,25 +4,29 @@
 // fallback when no photo is present). See assets/avatars/README.md.
 
 export const AVATAR_DIR = 'assets/avatars';
-export const AVATAR_COUNT = 11;
+export const AVATAR_COUNT = 15;
 
 // File extensions tried, in order. Real photos win; .svg placeholder is last.
 export const AVATAR_EXTS = ['png', 'jpg', 'jpeg', 'webp', 'svg'];
 
-// In-game name + gender for each portrait (avatar-01 … avatar-11).
-// `gender` ('m'/'f') is used to match AI players to same-gender handles.
+// In-game name + gender for each portrait (avatar-01 … avatar-15).
+// `gender` ('m'/'f'/'nb') is used to match AI players to same-gender handles.
 const AVATAR_META = [
-  { name: 'Silas Graves',        gender: 'm' }, // 01 — grizzled elder, handlebar mustache
-  { name: 'Cole Braddock',       gender: 'm' }, // 02 — bearded outlaw in a dark coat
-  { name: 'Diego Reyes',         gender: 'm' }, // 03 — young vaquero in suspenders
-  { name: 'Marshal Reed',        gender: 'm' }, // 04 — stoic lawman
-  { name: 'Boone Hartley',       gender: 'm' }, // 05 — weathered old trail hand
-  { name: 'Eli Two-Hawk',        gender: 'm' }, // 06 — braided plainsman
-  { name: 'Belle Sawyer',        gender: 'f' }, // 07 — blonde, hard-bitten gunhand
-  { name: 'Harriet Stone',       gender: 'f' }, // 08 — strong-jawed homesteader
-  { name: 'Rosa Delgado',        gender: 'f' }, // 09 — dark hair, red kerchief
-  { name: 'Winona Grey-Cloud',   gender: 'f' }, // 10 — braided, teal scarf
-  { name: 'Miss Adelaide Crowe', gender: 'f' }, // 11 — stern widow in black
+  { name: 'Silas Graves',        gender: 'm'  }, // 01 — grizzled elder, handlebar mustache
+  { name: 'Cole Braddock',       gender: 'm'  }, // 02 — bearded outlaw in a dark coat
+  { name: 'Diego Reyes',         gender: 'm'  }, // 03 — young vaquero in suspenders
+  { name: 'Marshal Reed',        gender: 'm'  }, // 04 — stoic lawman
+  { name: 'Boone Hartley',       gender: 'm'  }, // 05 — weathered old trail hand
+  { name: 'Eli Two-Hawk',        gender: 'm'  }, // 06 — braided plainsman
+  { name: 'Belle Sawyer',        gender: 'f'  }, // 07 — blonde, hard-bitten gunhand
+  { name: 'Harriet Stone',       gender: 'f'  }, // 08 — strong-jawed homesteader
+  { name: 'Rosa Delgado',        gender: 'f'  }, // 09 — dark hair, red kerchief
+  { name: 'Winona Grey-Cloud',   gender: 'f'  }, // 10 — braided, teal scarf
+  { name: 'Miss Adelaide Crowe', gender: 'f'  }, // 11 — stern widow in black
+  { name: 'Sage Ardmore',        gender: 'nb' }, // 12 — short-haired, leather coat
+  { name: 'Jesse Wilder',        gender: 'nb' }, // 13 — long hair and beard
+  { name: 'Charlie Quicksilver', gender: 'nb' }, // 14 — undercut, dark coat
+  { name: 'Rowan Bly',           gender: 'nb' }, // 15 — long hair, vest and scarf
 ];
 
 export const AVATARS = Array.from({ length: AVATAR_COUNT }, (_, i) => {
