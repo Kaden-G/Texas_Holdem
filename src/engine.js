@@ -58,7 +58,7 @@ export function startHand(game) {
     p.hand = [];
     p.currentBet = 0;
     p.totalBet = 0;
-    p.folded = false;
+    p.folded = p.chips <= 0; // busted players are out — they sit the hand out
     p.allIn = false;
   });
 

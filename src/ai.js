@@ -74,46 +74,53 @@ export function getAIPersonalities(genders) {
 export function aiDecision(player, gameState) {
   const { communityCards, pot, currentBet, minRaise } = gameState;
   const personality = player.personality;
-  const toCall = currentBet - player.currentBet;
+  const toCall = Math.max(0, currentBet - player.currentBet);
 
   const handStrength = estimateStrength(player.hand, communityCards);
+  // Pot odds: the equity you need to profitably call.
   const potOdds = toCall > 0 ? toCall / (pot + toCall) : 0;
+  // How big the call is relative to our stack.
+  const callFrac = player.chips > 0 ? toCall / player.chips : 1;
 
-  if (Math.random() < personality.bluff && toCall < player.chips * 0.15) {
-    const bluffAmount = minRaise + Math.floor(Math.random() * minRaise);
-    if (bluffAmount <= player.chips) {
-      return { action: 'raise', amount: Math.min(bluffAmount, player.chips) };
-    }
+  // Occasional bluff-raise, but only when nobody has bet into us.
+  if (toCall === 0 && Math.random() < personality.bluff) {
+    const bluff = minRaise + Math.floor(Math.random() * minRaise * 2);
+    if (bluff <= player.chips) return { action: 'raise', amount: bluff };
   }
 
+  // Premium hands: bet/raise for value; never fold.
   if (handStrength > 0.8) {
-    const raiseAmount = Math.floor(pot * (0.5 + personality.aggression * 0.5));
+    const raiseAmount = Math.floor(pot * (0.5 + personality.aggression * 0.6));
     if (raiseAmount >= minRaise && raiseAmount <= player.chips) {
       return { action: 'raise', amount: raiseAmount };
     }
-    return toCall <= player.chips ? { action: 'call' } : { action: 'fold' };
+    return { action: 'call' }; // call any size (engine caps a call at our stack)
   }
 
+  // Strong hands: usually just call any bet, sometimes re-raise.
   if (handStrength > 0.6) {
-    if (Math.random() < personality.aggression && toCall < player.chips * 0.2) {
-      const raiseAmount = minRaise + Math.floor(Math.random() * pot * 0.3);
-      if (raiseAmount <= player.chips) {
-        return { action: 'raise', amount: raiseAmount };
-      }
+    if (Math.random() < personality.aggression * 0.6 && callFrac < 0.3) {
+      const raiseAmount = minRaise + Math.floor(Math.random() * pot * 0.4);
+      if (raiseAmount <= player.chips) return { action: 'raise', amount: raiseAmount };
     }
-    return toCall <= player.chips * 0.3 ? { action: 'call' } : { action: 'fold' };
-  }
-
-  if (handStrength > 0.4) {
-    if (toCall === 0) return { action: 'check' };
-    return toCall <= player.chips * 0.15 ? { action: 'call' } : { action: 'fold' };
+    return { action: 'call' };
   }
 
   if (toCall === 0) return { action: 'check' };
 
-  if (personality.style === 'loose' && toCall < player.chips * 0.08) {
-    return { action: 'call' };
+  // Marginal hands: defend by pot odds. This is what punishes constant
+  // over-betting — a big bluff lays the table a good price, so decent hands
+  // call instead of always folding.
+  const slack = personality.style === 'loose' ? 0.14
+    : personality.style === 'tight' ? -0.05 : 0.06;
+  if (handStrength >= potOdds - slack) {
+    // ...but don't stack off light: cap how much of our stack we'll commit.
+    const maxFrac = 0.3 + handStrength * 0.6;
+    if (callFrac <= maxFrac) return { action: 'call' };
   }
+
+  // Sometimes call a small bet to keep aggressors honest.
+  if (callFrac < 0.06 && Math.random() < 0.5) return { action: 'call' };
 
   return { action: 'fold' };
 }
