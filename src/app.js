@@ -3,7 +3,8 @@ import { evaluateHand, HAND_NAMES, HAND_RANKS } from './hand-eval.js';
 import { createGame, startHand, applyAction, getValidActions, isHandOver, isGameOver, getGameWinner, PHASES, BIG_BLIND, STARTING_CHIPS } from './engine.js';
 import { getAIPersonalities, aiDecision } from './ai.js';
 import { AVATARS, avatarMarkup, pickRandomAvatars } from './avatars.js';
-import { initFirebase, createRoom, joinRoom, listenRoom, stopListening, setReady, pushGameState, startOnlineGame, pushAction, clearAction, getClientId, isHost, submitScore, fetchLeaderboards } from './firebase.js';
+import { initFirebase, createRoom, joinRoom, listenRoom, stopListening, setReady, pushGameState, startOnlineGame, pushAction, clearAction, getClientId, isHost } from './firebase.js';
+import { recordWin, getLeaderboards } from './leaderboard.js';
 
 let G = null;
 let isOnline = false;
@@ -357,15 +358,15 @@ function showGameOver() {
   show('gameover-overlay');
 }
 
-// Record this game's result to the global boards — but only my own human win,
-// so each finished game produces exactly one write (humans only, net profit).
+// Record this game's result to the boards — but only my own human win, so
+// each finished game is counted exactly once (humans only, net profit).
 function recordWinIfMine(winner) {
   if (scored) return;
   scored = true;
   if (!winner) return;
   const mine = isOnline ? (G.clientMap?.[myClientId] === winner.id) : !winner.isAI;
   const net = winner.chips - STARTING_CHIPS;
-  if (mine && net > 0) submitScore(winner.name, net);
+  if (mine && net > 0) recordWin(winner.name, net);
 }
 
 window.playAgain = () => {
@@ -374,11 +375,9 @@ window.playAgain = () => {
 };
 
 // ── LEADERBOARDS (Top Guns) ──
-window.showLeaderboard = async () => {
+window.showLeaderboard = () => {
   switchScreen('leaderboard-screen');
-  $('daily-board').innerHTML = '<li class="board-empty">Loading…</li>';
-  $('lifetime-board').innerHTML = '<li class="board-empty">Loading…</li>';
-  const { daily, lifetime } = await fetchLeaderboards();
+  const { daily, lifetime } = getLeaderboards();
   renderBoard('daily-board', daily);
   renderBoard('lifetime-board', lifetime);
 };
