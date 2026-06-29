@@ -118,3 +118,59 @@ export async function clearAction() {
 export function isHost(room) {
   return room && room.host === clientId;
 }
+
+// ── Leaderboard (global, humans only, net profit) ──
+function sanitizeKey(name) {
+  // Firebase keys can't contain . # $ [ ] / — collapse the name to a safe key.
+  return (name || 'stranger').toLowerCase().replace(/[.#$/\[\]]/g, '_').slice(0, 40) || 'stranger';
+}
+
+function todayKey() {
+  const d = new Date();
+  const p = n => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
+}
+
+// Record a human player's win, adding their net profit to today's board and
+// the all-time board (atomic increments).
+export async function submitScore(name, winnings) {
+  initFirebase();
+  if (!db || !(winnings > 0)) return;
+  const key = sanitizeKey(name);
+  const bump = ref => ref.transaction(cur => {
+    cur = cur || { name, winnings: 0, wins: 0 };
+    cur.name = name;
+    cur.winnings = (cur.winnings || 0) + winnings;
+    cur.wins = (cur.wins || 0) + 1;
+    return cur;
+  });
+  try {
+    await Promise.all([
+      bump(db.ref(`leaderboard/daily/${todayKey()}/${key}`)),
+      bump(db.ref(`leaderboard/lifetime/${key}`)),
+    ]);
+  } catch (e) {
+    console.error('submitScore failed', e);
+  }
+}
+
+// Top 10 for today and all-time, each sorted high→low by winnings.
+export async function fetchLeaderboards() {
+  initFirebase();
+  if (!db) return { daily: [], lifetime: [] };
+  const toArr = snap => {
+    const arr = [];
+    snap.forEach(c => { arr.push(c.val()); });
+    return arr.sort((a, b) => (b.winnings || 0) - (a.winnings || 0));
+  };
+  try {
+    const [d, l] = await Promise.all([
+      db.ref(`leaderboard/daily/${todayKey()}`).orderByChild('winnings').limitToLast(10).once('value'),
+      db.ref('leaderboard/lifetime').orderByChild('winnings').limitToLast(10).once('value'),
+    ]);
+    return { daily: toArr(d), lifetime: toArr(l) };
+  } catch (e) {
+    console.error('fetchLeaderboards failed', e);
+    return { daily: [], lifetime: [] };
+  }
+}

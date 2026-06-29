@@ -207,6 +207,70 @@ body {
   font-size: 16px;
 }
 
+/* ── LEADERBOARDS (Top Guns) ── */
+#leaderboard-screen {
+  justify-content: center;
+}
+.boards {
+  display: flex;
+  gap: 24px;
+  flex-wrap: wrap;
+  justify-content: center;
+  width: min(94vw, 780px);
+}
+.board {
+  flex: 1 1 320px;
+  background: var(--saloon-wood);
+  border: 2px solid var(--saloon-wood-light);
+  border-radius: 4px;
+  padding: 16px 20px;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+}
+.board-title {
+  font-family: 'Rye', cursive;
+  font-size: 19px;
+  color: var(--saloon-gold);
+  letter-spacing: 2px;
+  text-align: center;
+  margin-bottom: 12px;
+  text-shadow: 0 2px 4px rgba(0,0,0,0.6);
+}
+.board-list { list-style: none; }
+.board-row {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  padding: 7px 0;
+  border-bottom: 1px dashed rgba(201,168,76,0.15);
+}
+.board-rank {
+  font-family: 'Rye', cursive;
+  font-size: 15px;
+  color: var(--saloon-gold);
+  width: 24px;
+  text-align: right;
+}
+.board-name {
+  flex: 1;
+  color: var(--saloon-cream);
+  font-size: 17px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.board-win {
+  font-family: 'Playfair Display', serif;
+  font-weight: 700;
+  font-size: 17px;
+  color: var(--saloon-gold-bright);
+}
+.board-empty {
+  color: var(--text-dim);
+  text-align: center;
+  padding: 18px 4px;
+  font-style: italic;
+}
+
 /* ── SETUP SCREEN ── */
 #setup-screen {
   justify-content: center;

@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>DEAD HAND SALOON — Texas Hold'em</title>
-<link rel="stylesheet" href="styles.css?v=7">
+<link rel="stylesheet" href="styles.css?v=8">
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
 </head>
@@ -25,7 +25,24 @@
     <div class="title-info">Texas Hold'em Poker · 2–6 Players</div>
     <button class="btn btn-primary" onclick="window.showSetup()">🃏 SIT DOWN</button>
     <button class="btn btn-secondary" style="margin-top:12px;" onclick="window.goOnline()">🌐 ONLINE TABLE</button>
+    <button class="btn btn-secondary" style="margin-top:12px;" onclick="window.showLeaderboard()">🏆 TOP GUNS</button>
   </div>
+</div>
+
+<!-- LEADERBOARDS -->
+<div id="leaderboard-screen" class="screen">
+  <div class="panel-header">TOP GUNS</div>
+  <div class="boards">
+    <div class="board">
+      <div class="board-title">DAILY WINNERS</div>
+      <ol id="daily-board" class="board-list"></ol>
+    </div>
+    <div class="board">
+      <div class="board-title">LIFETIME LEADERS</div>
+      <ol id="lifetime-board" class="board-list"></ol>
+    </div>
+  </div>
+  <button class="btn btn-back" style="margin-top:20px;" onclick="window.showTitle()">← BACK</button>
 </div>
 
 <!-- LOBBY -->
@@ -99,9 +116,10 @@
     <div class="gameover-subtitle">walks away with</div>
     <div id="winner-chips">$1000</div>
     <button class="btn btn-primary" onclick="window.playAgain()">🃏 PLAY AGAIN</button>
+    <button class="btn btn-secondary" style="margin-top:10px;" onclick="window.showLeaderboard()">🏆 TOP GUNS</button>
   </div>
 </div>
 
-<script type="module" src="src/app.js?v=7"></script>
+<script type="module" src="src/app.js?v=8"></script>
 </body>
 </html>

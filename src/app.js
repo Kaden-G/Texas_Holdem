@@ -1,9 +1,9 @@
 import { createDeck, shuffleDeck, cardId, isRed, SUITS, RANKS } from './cards.js';
 import { evaluateHand, HAND_NAMES, HAND_RANKS } from './hand-eval.js';
-import { createGame, startHand, applyAction, getValidActions, isHandOver, isGameOver, getGameWinner, PHASES, BIG_BLIND } from './engine.js';
+import { createGame, startHand, applyAction, getValidActions, isHandOver, isGameOver, getGameWinner, PHASES, BIG_BLIND, STARTING_CHIPS } from './engine.js';
 import { getAIPersonalities, aiDecision } from './ai.js';
 import { AVATARS, avatarMarkup, pickRandomAvatars } from './avatars.js';
-import { initFirebase, createRoom, joinRoom, listenRoom, stopListening, setReady, pushGameState, startOnlineGame, pushAction, clearAction, getClientId, isHost } from './firebase.js';
+import { initFirebase, createRoom, joinRoom, listenRoom, stopListening, setReady, pushGameState, startOnlineGame, pushAction, clearAction, getClientId, isHost, submitScore, fetchLeaderboards } from './firebase.js';
 
 let G = null;
 let isOnline = false;
@@ -14,6 +14,7 @@ let seq = 0;
 let pendingReveal = false;
 let revealTimer = null;
 let aiTimer = null;
+let scored = false; // guard so a game's result is recorded to the boards once
 
 // ── DOM helpers ──
 const $ = id => document.getElementById(id);
@@ -131,6 +132,7 @@ window.startGame = () => {
   ];
   G = createGame(players);
   isOnline = false;
+  scored = false;
   switchScreen('game-screen');
   beginHand();
 };
@@ -252,6 +254,7 @@ window.launchOnline = async () => {
   entries.forEach(([cid], i) => { G.clientMap[cid] = i; });
   G = startHand(G);
   isOnline = true;
+  scored = false;
   seq++;
   await startOnlineGame();
   await pushGameState(G, seq);
@@ -269,7 +272,8 @@ function onRoomUpdate(data) {
       isOnline = true;
       switchScreen('game-screen');
       renderGame();
-      checkAITurn();
+      if (isGameOver(G)) showGameOver();
+      else checkAITurn();
     }
   } else if (!data.started) {
     renderLobbyRoom();
@@ -349,13 +353,54 @@ function showGameOver() {
   const winner = getGameWinner(G);
   $('winner-name').textContent = winner.name;
   $('winner-chips').textContent = `$${winner.chips}`;
+  recordWinIfMine(winner);
   show('gameover-overlay');
+}
+
+// Record this game's result to the global boards — but only my own human win,
+// so each finished game produces exactly one write (humans only, net profit).
+function recordWinIfMine(winner) {
+  if (scored) return;
+  scored = true;
+  if (!winner) return;
+  const mine = isOnline ? (G.clientMap?.[myClientId] === winner.id) : !winner.isAI;
+  const net = winner.chips - STARTING_CHIPS;
+  if (mine && net > 0) submitScore(winner.name, net);
 }
 
 window.playAgain = () => {
   hide('gameover-overlay');
   switchScreen('title-screen');
 };
+
+// ── LEADERBOARDS (Top Guns) ──
+window.showLeaderboard = async () => {
+  switchScreen('leaderboard-screen');
+  $('daily-board').innerHTML = '<li class="board-empty">Loading…</li>';
+  $('lifetime-board').innerHTML = '<li class="board-empty">Loading…</li>';
+  const { daily, lifetime } = await fetchLeaderboards();
+  renderBoard('daily-board', daily);
+  renderBoard('lifetime-board', lifetime);
+};
+
+function renderBoard(id, entries) {
+  const el = $(id);
+  if (!entries.length) {
+    el.innerHTML = '<li class="board-empty">No winners yet — be the first.</li>';
+    return;
+  }
+  el.innerHTML = entries.map((e, i) => `
+    <li class="board-row">
+      <span class="board-rank">${i + 1}</span>
+      <span class="board-name">${escapeHtml(e.name || 'Stranger')}</span>
+      <span class="board-win">$${(e.winnings || 0).toLocaleString()}</span>
+    </li>`).join('');
+}
+
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, c =>
+    ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
 
 window.continueGame = () => {
   clearTimeout(revealTimer);
