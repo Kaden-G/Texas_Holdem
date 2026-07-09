@@ -29,7 +29,7 @@ const useEmulator = new URLSearchParams(location.search).has('emu')
   || location.hostname === 'localhost'
   || location.hostname === '127.0.0.1';
 
-const app = getApps().length ? getApps()[0] : initializeApp(FIREBASE_CONFIG);
+const app = getApps().length ? getApps()[0] : initializeApp(firebaseConfig);
 export const auth = getAuth(app);
 export const dbFs = getFirestore(app);
 export const fns = getFunctions(app, 'us-central1');
