@@ -15,14 +15,14 @@ import {
 
 // Reuse Dead Hand Saloon's Firebase project. In a real deploy you would
 // point this at the poker-specific project.
-const FIREBASE_CONFIG = {
-  apiKey: 'AIzaSyDVa8eOLH6CXTt1nbgH9v7mkAb-RtgcbXg',
-  authDomain: 'fracture-105c1.firebaseapp.com',
-  databaseURL: 'https://fracture-105c1-default-rtdb.firebaseio.com',
-  projectId: 'fracture-105c1',
-  storageBucket: 'fracture-105c1.firebasestorage.app',
-  messagingSenderId: '926577785338',
-  appId: '1:926577785338:web:8c5170c92ced85e7b9cc43',
+const firebaseConfig = {
+  apiKey: "AIzaSyBEffNIGoD-YWJjU43yQwx6aX_QrgA5LBI",
+  authDomain: "dead-hand-saloon.firebaseapp.com",
+  projectId: "dead-hand-saloon",
+  storageBucket: "dead-hand-saloon.firebasestorage.app",
+  messagingSenderId: "794338177634",
+  appId: "1:794338177634:web:7b33ad15747e2626d6173b",
+  measurementId: "G-ZXB1VJFHMD"
 };
 
 const useEmulator = new URLSearchParams(location.search).has('emu')
