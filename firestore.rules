@@ -1,0 +1,31 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Public game state: readable by any authenticated user (spectator support).
+    // NEVER writable by clients — all mutations go through Cloud Functions
+    // (Admin SDK bypasses these rules).
+    match /games/{gameId} {
+      allow read: if request.auth != null;
+      allow write: if false;
+
+      // Private hole cards: only the owning player may read.
+      // Never client-writable.
+      match /private/{uid} {
+        allow read: if request.auth != null && request.auth.uid == uid;
+        allow write: if false;
+      }
+
+      // Server-only deck and any other server-scoped documents:
+      // no client access whatsoever.
+      match /server/{doc} {
+        allow read, write: if false;
+      }
+    }
+
+    // Deny by default for anything else.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

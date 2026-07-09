@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dead Hand Saloon — Secure Online Table</title>
+<link rel="stylesheet" href="holdem.css">
+</head>
+<body>
+<header>
+  <h1>Dead Hand Saloon</h1>
+  <div class="sub">Secure Online Table (Firestore + Cloud Functions)</div>
+  <div id="me"></div>
+</header>
+
+<section id="lobby">
+  <label>Name <input id="name" maxlength="24" placeholder="stranger"></label>
+  <button id="btn-create">Create game</button>
+  <span class="sep">·</span>
+  <label>Join game id <input id="join-id" placeholder="paste game id"></label>
+  <button id="btn-join">Join</button>
+</section>
+
+<section id="game">
+  <div class="game-meta">
+    <span>game <code id="gid">—</code></span>
+    <span>phase <code id="phase">—</code></span>
+    <span>pot <code id="pot">$0</code></span>
+    <span>to call <code id="current-bet">$0</code></span>
+    <button id="btn-leave" class="ghost">Leave</button>
+  </div>
+  <div class="community-row">
+    <div class="community-label">Community</div>
+    <div id="community" class="community-cards"></div>
+  </div>
+  <div id="showdown"></div>
+  <div id="seats"></div>
+  <div id="actions" class="action-bar"></div>
+  <div id="host-controls" class="host-controls"></div>
+</section>
+
+<footer>
+  <p>Public game state is readable; hole cards are per-player only; the deck is server-only. See <code>firestore.rules</code>.</p>
+</footer>
+
+<script type="module" src="holdem-ui.js"></script>
+</body>
+</html>
