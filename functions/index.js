@@ -254,7 +254,9 @@ exports.startHand = onCall({ enforceAppCheck: false }, async (req) => {
     if (!snap.exists) throw new HttpsError('not-found', 'Game not found');
     const g = snap.data();
     if (g.hostUid !== uid) throw new HttpsError('permission-denied', 'Only host may start hands');
-    if (!['waiting', 'between_hands'].includes(g.phase) && g.status !== 'waiting') {
+    // 'showdown' means the previous hand's reveal is up — that's also a
+    // valid start-the-next-hand state.
+    if (!['waiting', 'between_hands', 'showdown'].includes(g.phase) && g.status !== 'waiting') {
       throw new HttpsError('failed-precondition', 'A hand is already in progress');
     }
     const maxSeats = g.settings.maxPlayers;

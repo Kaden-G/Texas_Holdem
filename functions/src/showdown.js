@@ -104,11 +104,12 @@ function resolveFoldAround(game) {
   const winners = [];
   const alive = inHandSeats(seats);
   if (alive.length !== 1) return { updatedSeats: seats, winners, revealed: {} };
-  const winnerSeat = alive[0];
+  // alive[0] is a spread copy — mutate the underlying seat ref, not the copy.
+  const winnerRef = seats[alive[0].seat];
   for (const pot of pots) {
-    if (!pot.eligibleUids.includes(winnerSeat.uid)) continue;   // side pot returns to contributors if winner isn't eligible; shouldn't happen mid-fold
-    winnerSeat.stack += pot.amount;
-    winners.push({ uid: winnerSeat.uid, amount: pot.amount, handRank: 'Uncontested' });
+    if (!pot.eligibleUids.includes(winnerRef.uid)) continue;   // side pot returns to contributors if winner isn't eligible; shouldn't happen mid-fold
+    winnerRef.stack += pot.amount;
+    winners.push({ uid: winnerRef.uid, amount: pot.amount, handRank: 'Uncontested' });
   }
   return { updatedSeats: seats, winners, revealed: {} };
 }
