@@ -12,7 +12,7 @@ const DEFAULT_SETTINGS = {
   maxPlayers: 6,
 };
 
-function newSeat(uid, displayName, seatIndex, settings) {
+function newSeat(uid, displayName, seatIndex, settings, extras) {
   return {
     uid,
     displayName: (displayName || 'stranger').slice(0, 24),
@@ -22,7 +22,20 @@ function newSeat(uid, displayName, seatIndex, settings) {
     status: 'sitting_out',   // becomes 'active' when a hand starts
     hasActedThisStreet: false,
     seat: seatIndex,
+    isAI: !!(extras && extras.isAI),
+    avatarId: (extras && extras.avatarId) || null,
+    personalityId: (extras && extras.personalityId) || null,
   };
+}
+
+function newAiSeat(seatIndex, settings, extras) {
+  const uid = `ai:seat:${seatIndex}`;
+  const name = (extras && extras.displayName) || 'Bot';
+  return newSeat(uid, name, seatIndex, settings, {
+    isAI: true,
+    avatarId: extras && extras.avatarId,
+    personalityId: extras && extras.personalityId,
+  });
 }
 
 function pickOpenSeat(seats, maxSeats) {
@@ -101,6 +114,7 @@ function foldAround(seats) {
 module.exports = {
   DEFAULT_SETTINGS,
   newSeat,
+  newAiSeat,
   pickOpenSeat,
   nextDealerSeat,
   blindSeats,

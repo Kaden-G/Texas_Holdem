@@ -453,6 +453,48 @@ body {
   font-style: italic;
 }
 
+.lobby-seat-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.lobby-seat {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px;
+  background: var(--saloon-dark);
+  border: 1px solid var(--saloon-wood-light);
+  border-radius: 3px;
+}
+.lobby-seat-name {
+  flex: 1;
+  color: var(--saloon-cream);
+  font-size: 17px;
+}
+.lobby-badge {
+  font-family: 'Rye', cursive;
+  font-size: 11px;
+  letter-spacing: 1.5px;
+  padding: 3px 8px;
+  border-radius: 2px;
+  border: 1px solid;
+}
+.lobby-badge-host {
+  color: var(--saloon-gold-bright);
+  border-color: var(--saloon-gold);
+}
+.lobby-badge-ai {
+  color: var(--saloon-felt-light);
+  border-color: var(--saloon-felt-light);
+}
+.lobby-buttons {
+  flex-direction: row;
+  flex-wrap: wrap;
+  justify-content: center;
+  margin-top: 20px;
+}
+
 /* ── GAME SCREEN ── */
 #game-screen {
   padding: 0;

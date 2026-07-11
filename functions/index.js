@@ -1,6 +1,7 @@
 'use strict';
 
 const admin = require('firebase-admin');
+const crypto = require('crypto');
 const { onCall, HttpsError } = require('firebase-functions/v2/https');
 const { setGlobalOptions } = require('firebase-functions/v2');
 
@@ -12,9 +13,19 @@ const FieldValue = admin.firestore.FieldValue;
 
 const { freshShuffledDeck } = require('./src/deck');
 const {
-  DEFAULT_SETTINGS, newSeat, pickOpenSeat, nextDealerSeat, blindSeats,
+  DEFAULT_SETTINGS, newSeat, newAiSeat, pickOpenSeat, nextDealerSeat, blindSeats,
   firstToActPreflop, firstToActPostflop, roundIsComplete, foldAround,
 } = require('./src/game');
+
+// 4-letter room code alphabet: unambiguous (no 0/O, 1/I).
+const CODE_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+function randomCode() {
+  let s = '';
+  for (let i = 0; i < 4; i++) s += CODE_ALPHABET[crypto.randomInt(0, CODE_ALPHABET.length)];
+  return s;
+}
+function codeRef(code) { return db.doc(`codes/${code}`); }
+function aiHandRef(gameId, seatIdx) { return db.doc(`games/${gameId}/aiHands/${seatIdx}`); }
 const {
   ActionError, validateAndApply, advanceActionSeat, beginStreet,
 } = require('./src/actions');
@@ -113,17 +124,36 @@ exports.createGame = onCall({ enforceAppCheck: false }, async (req) => {
   const uid = requireAuth(req);
   const settings = sanitizeSettings(req.data && req.data.settings);
   const displayName = (req.data && req.data.displayName) || 'host';
+  const avatarId = (req.data && req.data.avatarId) || null;
+  const deckId = (req.data && req.data.deckId) || null;
 
   const gameId = db.collection('games').doc().id;
   const now = FieldValue.serverTimestamp();
 
-  const seats = { 0: newSeat(uid, displayName, 0, settings) };
+  const seats = { 0: newSeat(uid, displayName, 0, settings, { avatarId }) };
+
+  // Reserve a unique 4-letter room code. Retry on collision.
+  let code = null;
+  for (let attempt = 0; attempt < 12 && !code; attempt++) {
+    const candidate = randomCode();
+    const reserved = await db.runTransaction(async (tx) => {
+      const snap = await tx.get(codeRef(candidate));
+      if (snap.exists) return false;
+      tx.set(codeRef(candidate), { gameId, createdAt: now });
+      return true;
+    });
+    if (reserved) code = candidate;
+  }
+  if (!code) throw new HttpsError('resource-exhausted', 'Could not allocate a room code, try again');
+
   await gameRef(gameId).set({
     status: 'waiting',
     createdAt: now,
     updatedAt: now,
     hostUid: uid,
     settings,
+    code,
+    deckId,
     handNumber: 0,
     phase: 'between_hands',
     communityCards: [],
@@ -138,7 +168,48 @@ exports.createGame = onCall({ enforceAppCheck: false }, async (req) => {
     seats,
     showdown: null,
   });
-  return { gameId };
+  return { gameId, code };
+});
+
+// ---------- joinByCode ----------
+
+exports.joinByCode = onCall({ enforceAppCheck: false }, async (req) => {
+  requireAuth(req);
+  const code = String((req.data && req.data.code) || '').toUpperCase().trim();
+  if (code.length !== 4) throw new HttpsError('invalid-argument', 'Enter a 4-letter code');
+  const snap = await codeRef(code).get();
+  if (!snap.exists) throw new HttpsError('not-found', 'No game with that code');
+  return { gameId: snap.data().gameId };
+});
+
+// ---------- addAiSeat ----------
+
+exports.addAiSeat = onCall({ enforceAppCheck: false }, async (req) => {
+  const uid = requireAuth(req);
+  const gameId = req.data && req.data.gameId;
+  const displayName = (req.data && req.data.displayName) || 'Bot';
+  const avatarId = (req.data && req.data.avatarId) || null;
+  const personalityId = (req.data && req.data.personalityId) || null;
+  if (!gameId) throw new HttpsError('invalid-argument', 'gameId required');
+
+  const seatAssigned = await db.runTransaction(async (tx) => {
+    const snap = await tx.get(gameRef(gameId));
+    if (!snap.exists) throw new HttpsError('not-found', 'Game not found');
+    const g = snap.data();
+    if (g.hostUid !== uid) throw new HttpsError('permission-denied', 'Only host may add AI seats');
+    if (!['waiting', 'between_hands'].includes(g.phase) && g.status !== 'waiting') {
+      throw new HttpsError('failed-precondition', 'Cannot add AI mid-hand');
+    }
+    const seatIdx = pickOpenSeat(g.seats || {}, g.settings.maxPlayers);
+    if (seatIdx === -1) throw new HttpsError('failed-precondition', 'Table full');
+    const seat = newAiSeat(seatIdx, g.settings, { displayName, avatarId, personalityId });
+    tx.update(gameRef(gameId), {
+      [`seats.${seatIdx}`]: seat,
+      updatedAt: FieldValue.serverTimestamp(),
+    });
+    return seatIdx;
+  });
+  return { seat: seatAssigned };
 });
 
 // ---------- joinGame ----------
@@ -147,6 +218,7 @@ exports.joinGame = onCall({ enforceAppCheck: false }, async (req) => {
   const uid = requireAuth(req);
   const gameId = req.data && req.data.gameId;
   const displayName = (req.data && req.data.displayName) || 'stranger';
+  const avatarId = (req.data && req.data.avatarId) || null;
   if (!gameId) throw new HttpsError('invalid-argument', 'gameId required');
 
   const seatAssigned = await db.runTransaction(async (tx) => {
@@ -160,7 +232,7 @@ exports.joinGame = onCall({ enforceAppCheck: false }, async (req) => {
     }
     const seatIdx = pickOpenSeat(g.seats || {}, g.settings.maxPlayers);
     if (seatIdx === -1) throw new HttpsError('failed-precondition', 'Table full');
-    const seat = newSeat(uid, displayName, seatIdx, g.settings);
+    const seat = newSeat(uid, displayName, seatIdx, g.settings, { avatarId });
     tx.update(gameRef(gameId), {
       [`seats.${seatIdx}`]: seat,
       updatedAt: FieldValue.serverTimestamp(),
@@ -201,7 +273,9 @@ exports.startHand = onCall({ enforceAppCheck: false }, async (req) => {
         s.sittingOutForNextHand = false;
         continue;
       }
-      if (s.status !== 'sitting_out') s.status = 'active';
+      // Everyone else — including seats that just joined and are marked
+      // sitting_out by default — comes into the hand active.
+      if (s.status !== 'busted') s.status = 'active';
     }
     const eligible = livingSeats(g.seats).filter(s => g.seats[s.seat].stack > 0);
     if (eligible.length < 2) throw new HttpsError('failed-precondition', 'Need ≥2 living players');
@@ -256,11 +330,16 @@ exports.startHand = onCall({ enforceAppCheck: false }, async (req) => {
     tx.set(deckRef(gameId), {
       cards: deck.cards, burned: deck.burned, handNumber,
     });
-    for (const uid2 of Object.keys(holeMap)) {
-      tx.set(privateRef(gameId, uid2), {
-        holeCards: holeMap[uid2],
-        handNumber,
-      });
+    // Write hole cards: humans to /private/{uid} (owner-readable),
+    // AI seats to /aiHands/{seatIdx} (host-readable via firestore.rules).
+    for (const seatObj of inHand) {
+      const cards = holeMap[seatObj.uid];
+      if (!cards) continue;
+      if (seatObj.isAI) {
+        tx.set(aiHandRef(gameId, seatObj.seat), { holeCards: cards, handNumber });
+      } else {
+        tx.set(privateRef(gameId, seatObj.uid), { holeCards: cards, handNumber });
+      }
     }
     tx.update(gameRef(gameId), {
       status: 'playing',
@@ -294,21 +373,29 @@ exports.playerAction = onCall({ enforceAppCheck: false }, async (req) => {
 
   await db.runTransaction(async (tx) => {
     // Firestore transactions require ALL reads before ANY writes. Pull
-    // game + deck + every seated player's private hole-card doc upfront;
+    // game + deck + every seated player's hole-card doc upfront;
     // we may not use them all, but we cannot go back and read after a
     // write.
     const gSnap = await tx.get(gameRef(gameId));
     if (!gSnap.exists) throw new HttpsError('not-found', 'Game not found');
     const g = gSnap.data();
 
-    const seatedUids = Object.values(g.seats || {}).map(s => s.uid);
-    const [deckSnap, ...privSnaps] = await Promise.all([
+    const seatedSeats = Object.values(g.seats || {});
+    const humanSeats = seatedSeats.filter(s => !s.isAI);
+    const aiSeats = seatedSeats.filter(s => s.isAI);
+    const [deckSnap, ...allSnaps] = await Promise.all([
       tx.get(deckRef(gameId)),
-      ...seatedUids.map(u => tx.get(privateRef(gameId, u))),
+      ...humanSeats.map(s => tx.get(privateRef(gameId, s.uid))),
+      ...aiSeats.map(s => tx.get(aiHandRef(gameId, s.seat))),
     ]);
     const handMap = {};
-    privSnaps.forEach((p, i) => {
-      if (p.exists) handMap[seatedUids[i]] = p.data().holeCards;
+    humanSeats.forEach((s, i) => {
+      const snap = allSnaps[i];
+      if (snap.exists) handMap[s.uid] = snap.data().holeCards;
+    });
+    aiSeats.forEach((s, i) => {
+      const snap = allSnaps[humanSeats.length + i];
+      if (snap.exists) handMap[s.uid] = snap.data().holeCards;
     });
     const deck = deckSnap.exists
       ? {
@@ -317,8 +404,19 @@ exports.playerAction = onCall({ enforceAppCheck: false }, async (req) => {
         }
       : null;
 
+    // Host may act for AI seats. For all other seats the actor must be
+    // the seat's own uid.
+    let actorUid = uid;
+    const actionSeat = g.seats && g.seats[g.actionSeat];
+    if (actionSeat && actionSeat.isAI) {
+      if (uid !== g.hostUid) {
+        throw new HttpsError('permission-denied', 'Only host may act for AI seats');
+      }
+      actorUid = actionSeat.uid;
+    }
+
     try {
-      validateAndApply(g, uid, action, amount);
+      validateAndApply(g, actorUid, action, amount);
     } catch (e) {
       if (e instanceof ActionError) throw new HttpsError(e.code, e.message);
       throw e;

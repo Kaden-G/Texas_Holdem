@@ -16,11 +16,25 @@ service cloud.firestore {
         allow write: if false;
       }
 
+      // AI hole cards: readable only by the game's host (they act for AI).
+      match /aiHands/{seat} {
+        allow read: if request.auth != null
+          && get(/databases/$(database)/documents/games/$(gameId)).data.hostUid == request.auth.uid;
+        allow write: if false;
+      }
+
       // Server-only deck and any other server-scoped documents:
       // no client access whatsoever.
       match /server/{doc} {
         allow read, write: if false;
       }
+    }
+
+    // Room code → gameId mapping. Anyone signed in can look up (needed
+    // to resolve a code before joining); writes are server-only.
+    match /codes/{code} {
+      allow read: if request.auth != null;
+      allow write: if false;
     }
 
     // Deny by default for anything else.

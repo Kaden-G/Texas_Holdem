@@ -1,24 +1,34 @@
-import { createDeck, shuffleDeck, cardId, isRed, SUITS, RANKS } from './cards.js';
+import { createDeck, shuffleDeck, cardId, isRed, SUITS, RANKS, RANK_VALUES } from './cards.js';
 import { evaluateHand, HAND_NAMES, HAND_RANKS } from './hand-eval.js';
 import { createGame, startHand, applyAction, getValidActions, isHandOver, isGameOver, getGameWinner, PHASES, BIG_BLIND, STARTING_CHIPS, BLIND_LEVELS, LEVEL_SECONDS } from './engine.js';
 import { getAIPersonalities, aiDecision } from './ai.js';
 import { AVATARS, avatarMarkup, pickRandomAvatars } from './avatars.js';
 import { DECKS, deckById } from './decks.js';
-import { initFirebase, createRoom, joinRoom, listenRoom, stopListening, setReady, pushGameState, startOnlineGame, pushAction, clearAction, getClientId, isHost } from './firebase.js';
 import { recordWin, getLeaderboards } from './leaderboard.js';
+import * as Online from './online.js';
 
 let G = null;
-let isOnline = false;
-let roomCode = null;
-let roomData = null;
-let myClientId = null;
-let seq = 0;
 let pendingReveal = false;
 let revealTimer = null;
 let aiTimer = null;
 let scored = false; // guard so a game's result is recorded to the boards once
 let gameStart = 0;  // wall-clock start of the current game (for blind escalation)
 let blindLevel = 0;
+
+// ── Online mode state ──
+let mode = 'single';                 // 'single' | 'online'
+let onlineGameId = null;
+let onlineCode = null;
+let onlineDoc = null;                // latest snapshot of the Firestore game doc
+let onlineMyHand = null;             // { holeCards: [str,str], handNumber }
+let onlineAiHands = {};              // { [seatIdx]: { holeCards, handNumber } }
+let onlineMyUid = null;              // populated after auth
+let onlineIsHost = false;
+let unsubGame = null;
+let unsubMyHand = null;
+let unsubAiHands = null;
+let onlineAiTimer = null;
+let onlineAiInFlight = false;         // guard against re-entrancy on snapshot bursts
 
 // ── DOM helpers ──
 const $ = id => document.getElementById(id);
@@ -55,11 +65,36 @@ function chipPileHtml(amount, size = 'sm') {
 }
 
 // ── TITLE ──
-window.showTitle = () => switchScreen('title-screen');
+window.showTitle = () => {
+  teardownOnline();
+  mode = 'single';
+  switchScreen('title-screen');
+};
 window.showSetup = () => {
+  mode = 'single';
   renderSetup();
   switchScreen('setup-screen');
 };
+window.showOnlineSetup = () => {
+  mode = 'online';
+  renderSetup();
+  switchScreen('setup-screen');
+};
+
+function teardownOnline() {
+  if (unsubGame) { try { unsubGame(); } catch (_) {} unsubGame = null; }
+  if (unsubMyHand) { try { unsubMyHand(); } catch (_) {} unsubMyHand = null; }
+  if (unsubAiHands) { try { unsubAiHands(); } catch (_) {} unsubAiHands = null; }
+  clearTimeout(onlineAiTimer);
+  onlineAiTimer = null;
+  onlineAiInFlight = false;
+  onlineGameId = null;
+  onlineCode = null;
+  onlineDoc = null;
+  onlineMyHand = null;
+  onlineAiHands = {};
+  onlineIsHost = false;
+}
 
 // ── SETUP (single player) ──
 let setupAICount = 4;
@@ -99,20 +134,38 @@ function wireDeckGallery(container, onPick) {
 function renderSetup() {
   const grid = $('setup-grid');
   grid.innerHTML = '';
-  const slider = document.createElement('div');
-  slider.className = 'setup-row';
-  slider.innerHTML = `
-    <label class="setup-label">OPPONENTS</label>
-    <div class="setup-slider-wrap">
-      <input type="range" min="1" max="5" value="${setupAICount}" id="ai-count-slider" class="setup-slider">
-      <span class="setup-slider-val" id="ai-count-val">${setupAICount}</span>
-    </div>
-  `;
-  grid.appendChild(slider);
-  $('ai-count-slider').oninput = e => {
-    setupAICount = +e.target.value;
-    $('ai-count-val').textContent = setupAICount;
-  };
+
+  // Panel header switches to "HOST A TABLE" for online.
+  const header = document.querySelector('#setup-screen .panel-header');
+  if (header) header.textContent = mode === 'online' ? 'HOST A TABLE' : 'SET YOUR STAKES';
+
+  // Bottom-of-panel buttons: swap between single-player DEAL and online HOST/JOIN.
+  const btnGroup = document.querySelector('#setup-screen .setup-buttons');
+  if (btnGroup) {
+    btnGroup.innerHTML = mode === 'online'
+      ? `<button class="btn btn-back" onclick="window.showTitle()">← BACK</button>
+         <button class="btn btn-secondary" onclick="window.showJoinCode()">🚪 JOIN GAME</button>
+         <button class="btn btn-primary" onclick="window.hostOnlineGame()">🏠 HOST GAME</button>`
+      : `<button class="btn btn-back" onclick="window.showTitle()">← BACK</button>
+         <button class="btn btn-primary" onclick="window.startGame()">DEAL 'EM →</button>`;
+  }
+
+  if (mode === 'single') {
+    const slider = document.createElement('div');
+    slider.className = 'setup-row';
+    slider.innerHTML = `
+      <label class="setup-label">OPPONENTS</label>
+      <div class="setup-slider-wrap">
+        <input type="range" min="1" max="5" value="${setupAICount}" id="ai-count-slider" class="setup-slider">
+        <span class="setup-slider-val" id="ai-count-val">${setupAICount}</span>
+      </div>
+    `;
+    grid.appendChild(slider);
+    $('ai-count-slider').oninput = e => {
+      setupAICount = +e.target.value;
+      $('ai-count-val').textContent = setupAICount;
+    };
+  }
 
   const nameRow = document.createElement('div');
   nameRow.className = 'setup-row';
@@ -175,7 +228,6 @@ window.startGame = () => {
     })),
   ];
   G = createGame(players);
-  isOnline = false;
   scored = false;
   gameStart = Date.now();
   blindLevel = 0;
@@ -184,167 +236,332 @@ window.startGame = () => {
   beginHand();
 };
 
-// ── ONLINE ──
-window.goOnline = () => {
-  initFirebase();
-  myClientId = getClientId();
-  switchScreen('lobby-screen');
-  renderLobbyMenu();
+// ── ONLINE: setup → host / join → lobby → game ──
+
+window.hostOnlineGame = async () => {
+  const name = ($('player-name')?.value || 'Stranger').trim() || 'Stranger';
+  try {
+    await Online.waitForAuth();
+    onlineMyUid = Online.myUid();
+    const { gameId, code } = await Online.createGame({
+      displayName: name, avatarId: setupAvatarId, deckId: setupDeckId,
+    });
+    onlineGameId = gameId;
+    onlineCode = code;
+    onlineIsHost = true;
+    setDeckBack(setupDeckId);
+    subscribeOnline();
+    renderLobby();
+    switchScreen('lobby-screen');
+  } catch (e) {
+    alert('Error hosting game: ' + (e.message || e));
+  }
 };
 
-function renderLobbyMenu() {
+window.showJoinCode = () => {
+  onlineIsHost = false;
+  renderJoin();
+  switchScreen('lobby-screen');
+};
+
+window.joinOnlineByCode = async () => {
+  const code = ($('join-code-input')?.value || '').trim().toUpperCase();
+  const name = ($('player-name')?.value || 'Stranger').trim() || 'Stranger';
+  if (code.length !== 4) { alert('Enter a 4-letter room code'); return; }
+  try {
+    await Online.waitForAuth();
+    onlineMyUid = Online.myUid();
+    const { gameId } = await Online.joinByCode(code);
+    await Online.joinGame(gameId, { displayName: name, avatarId: setupAvatarId });
+    onlineGameId = gameId;
+    onlineCode = code;
+    onlineIsHost = false;
+    setDeckBack(setupDeckId);
+    subscribeOnline();
+    renderLobby();
+  } catch (e) {
+    alert('Join failed: ' + (e.message || e));
+  }
+};
+
+window.addAiSeat = async () => {
+  if (!onlineGameId || !onlineIsHost) return;
+  // Fill the next open seat with a themed AI.
+  const seatsMap = onlineDoc?.seats || {};
+  const taken = new Set(Object.values(seatsMap).map(s => s.avatarId).filter(Boolean));
+  const remaining = AVATARS.filter(a => !taken.has(a.id));
+  if (!remaining.length) return;
+  const pick = remaining[Math.floor(Math.random() * remaining.length)];
+  const personality = getAIPersonalities([pick.gender])[0];
+  try {
+    await Online.addAiSeat(onlineGameId, {
+      displayName: personality.name,
+      avatarId: pick.id,
+      personalityId: personality.style || null,
+    });
+  } catch (e) {
+    alert('Add AI failed: ' + (e.message || e));
+  }
+};
+
+window.dealOnlineHand = async () => {
+  if (!onlineGameId || !onlineIsHost) return;
+  try {
+    await Online.startHand(onlineGameId);
+    gameStart = Date.now();
+    blindLevel = 0;
+    switchScreen('game-screen');
+  } catch (e) {
+    alert('Deal failed: ' + (e.message || e));
+  }
+};
+
+window.leaveOnlineGame = async () => {
+  if (onlineGameId) {
+    try { await Online.leaveGame(onlineGameId); } catch (_) {}
+  }
+  teardownOnline();
+  mode = 'single';
+  switchScreen('title-screen');
+};
+
+function subscribeOnline() {
+  if (unsubGame) { try { unsubGame(); } catch (_) {} }
+  if (unsubMyHand) { try { unsubMyHand(); } catch (_) {} }
+  if (unsubAiHands) { try { unsubAiHands(); } catch (_) {} }
+  unsubGame = Online.subscribeGame(onlineGameId, (doc) => {
+    onlineDoc = doc;
+    applyOnlineSnapshot();
+  });
+  unsubMyHand = Online.subscribeMyHand(onlineGameId, onlineMyUid, (data) => {
+    onlineMyHand = data;
+    applyOnlineSnapshot();
+  });
+  if (onlineIsHost) {
+    unsubAiHands = Online.subscribeAiHands(onlineGameId, (bySeat) => {
+      onlineAiHands = bySeat;
+      applyOnlineSnapshot();
+    });
+  }
+}
+
+// Server card format ("As", "Th", …) → client card object.
+const _SERVER_SUITS = { s: '♠', h: '♥', d: '♦', c: '♣' };
+function serverCardToClient(c) {
+  if (!c || typeof c !== 'string' || c.length !== 2) return null;
+  const rank = c[0] === 'T' ? '10' : c[0];
+  const suit = _SERVER_SUITS[c[1]] || '♠';
+  return { rank, suit, value: RANK_VALUES[rank] };
+}
+
+// Convert the Firestore game doc (+ my hole cards + AI hole cards if host)
+// into a G-shaped object the single-player render loop can consume.
+function stateFromDoc(doc) {
+  if (!doc) return null;
+  const seatsMap = doc.seats || {};
+  const seatIdxs = Object.keys(seatsMap).map(k => parseInt(k, 10)).sort((a, b) => a - b);
+  const players = seatIdxs.map((idx) => {
+    const s = seatsMap[idx];
+    const isMe = !s.isAI && s.uid === onlineMyUid;
+    // Hole cards: show mine (always), reveal at showdown per doc.showdown.revealed,
+    // otherwise represent as two facedown placeholders (length===2).
+    let hand = [];
+    const inHand = ['active', 'all_in', 'folded'].includes(s.status);
+    if (inHand && doc.handNumber > 0 && doc.phase !== 'between_hands') {
+      const revealedByUid = doc.showdown?.revealed || {};
+      if (isMe && onlineMyHand?.holeCards) {
+        hand = onlineMyHand.holeCards.map(serverCardToClient);
+      } else if (revealedByUid[s.uid]) {
+        hand = revealedByUid[s.uid].map(serverCardToClient);
+      } else {
+        hand = [{ rank: '?', suit: '?', value: 0 }, { rank: '?', suit: '?', value: 0 }];
+      }
+    }
+    return {
+      id: idx,
+      seatIdx: idx,
+      uid: s.uid,
+      name: s.displayName,
+      isAI: !!s.isAI,
+      avatar: s.avatarId || null,
+      chips: s.stack,
+      currentBet: s.committedThisStreet || 0,
+      folded: s.status === 'folded',
+      allIn: s.status === 'all_in',
+      hand,
+    };
+  });
+
+  const activeIndex = players.findIndex(p => p.seatIdx === doc.actionSeat);
+  const dealerIndex = players.findIndex(p => p.seatIdx === doc.dealerSeat);
+  const winnersArr = (doc.showdown?.winners || []).map(w => ({
+    player: players.find(p => p.uid === w.uid) || null,
+    amount: w.amount,
+    hand: w.handRank,
+  })).filter(w => w.player);
+
+  return {
+    players,
+    phase: doc.phase === 'between_hands' ? 'showdown' : doc.phase,
+    communityCards: (doc.communityCards || []).map(serverCardToClient).filter(Boolean),
+    pot: doc.pot || 0,
+    currentBet: doc.currentBet || 0,
+    minRaise: doc.minRaise || (doc.settings?.bigBlind || 20),
+    smallBlind: doc.settings?.smallBlind || 10,
+    bigBlind: doc.settings?.bigBlind || 20,
+    activeIndex: activeIndex === -1 ? 0 : activeIndex,
+    dealerIndex: dealerIndex === -1 ? 0 : dealerIndex,
+    roundNum: doc.handNumber || 0,
+    winners: winnersArr,
+    log: [],   // TODO: derive from lastAction / phase in a follow-up
+    _online: true,
+    _phaseRaw: doc.phase,
+    _handOver: doc.phase === 'between_hands' || doc.phase === 'showdown',
+  };
+}
+
+// Called on every snapshot: rebuild G, decide what to render, and drive
+// AI turns if we're the host.
+function applyOnlineSnapshot() {
+  if (mode !== 'online' || !onlineDoc) return;
+  // In lobby (waiting or between hands with no cards yet): show the lobby.
+  const currentScreen = document.querySelector('.screen.active')?.id || '';
+  const preGame = onlineDoc.status === 'waiting'
+    || (onlineDoc.status === 'playing' && onlineDoc.phase === 'between_hands' && onlineDoc.handNumber === 0);
+  if (preGame && currentScreen !== 'game-screen') {
+    renderLobby();
+    return;
+  }
+
+  G = stateFromDoc(onlineDoc);
+  if (!G) return;
+
+  if (currentScreen !== 'game-screen') switchScreen('game-screen');
+  renderGame();
+
+  // Between-hands (finished hand): pause on the last hand's reveal.
+  if (G._handOver) {
+    pendingReveal = true;
+    return;
+  }
+  pendingReveal = false;
+
+  // Host drives AI turns.
+  if (onlineIsHost) driveOnlineAiTurn();
+}
+
+async function driveOnlineAiTurn() {
+  if (!G || G._handOver || onlineAiInFlight) return;
+  const active = G.players[G.activeIndex];
+  if (!active || !active.isAI) return;
+  const aiHand = onlineAiHands[active.seatIdx];
+  if (!aiHand?.holeCards) return;   // host has not received AI hole cards yet
+  const holeClient = aiHand.holeCards.map(serverCardToClient);
+  onlineAiInFlight = true;
+  clearTimeout(onlineAiTimer);
+  onlineAiTimer = setTimeout(async () => {
+    try {
+      const personalitySeed = active.name.charCodeAt(0);
+      const personality = {
+        name: active.name,
+        aggression: 0.4 + ((personalitySeed % 5) * 0.1),
+        loose: 0.3 + ((personalitySeed % 3) * 0.15),
+        style: 'calculated',
+      };
+      const decision = aiDecision(
+        { ...active, hand: holeClient, personality },
+        {
+          communityCards: G.communityCards,
+          pot: G.pot,
+          currentBet: G.currentBet,
+          minRaise: G.minRaise,
+        },
+      );
+      const action = decision.action === 'all-in' ? 'all_in' : decision.action;
+      let amount = 0;
+      if (decision.action === 'raise') amount = G.currentBet + (decision.amount || G.minRaise);
+      await Online.playerAction(onlineGameId, action, amount);
+    } catch (e) {
+      console.error('AI action failed', e);
+    } finally {
+      onlineAiInFlight = false;
+    }
+  }, 2500 + Math.random() * 1500);
+}
+
+function renderLobby() {
   const body = $('lobby-body');
+  if (!body) return;
+  if (!onlineDoc && !onlineIsHost) {
+    // Join view — no game yet.
+    renderJoin();
+    return;
+  }
+  const seatsMap = onlineDoc?.seats || {};
+  const seatEntries = Object.keys(seatsMap).map(k => parseInt(k, 10)).sort((a, b) => a - b)
+    .map(idx => ({ idx, seat: seatsMap[idx] }));
+  const humanCount = seatEntries.filter(({ seat }) => !seat.isAI).length;
+  const aiCount = seatEntries.filter(({ seat }) => seat.isAI).length;
+  const totalCount = seatEntries.length;
+  const maxSeats = onlineDoc?.settings?.maxPlayers || 6;
+  const canDeal = onlineIsHost && totalCount >= 2;
+
+  body.innerHTML = `
+    <div class="lobby-menu">
+      <div class="lobby-row lobby-code-row">
+        <div class="room-code-display">Code <span class="room-code">${onlineCode || '—'}</span></div>
+        <div class="lobby-hint">Share this with friends so they can join.</div>
+      </div>
+      <div class="lobby-row">
+        <label class="setup-label">AT THE TABLE (${totalCount}/${maxSeats})</label>
+        <div class="lobby-seat-list">
+          ${seatEntries.map(({ idx, seat }) => {
+            const av = AVATARS.find(a => a.id === seat.avatarId);
+            const av_html = av ? avatarMarkup(av, 'avatar-sm') : '';
+            const badge = seat.isAI ? '<span class="lobby-badge lobby-badge-ai">AI</span>'
+                       : (seat.uid === onlineDoc?.hostUid ? '<span class="lobby-badge lobby-badge-host">HOST</span>' : '');
+            return `<div class="lobby-seat">
+              ${av_html}
+              <span class="lobby-seat-name">${escapeHtml(seat.displayName || 'Player')}</span>
+              ${badge}
+            </div>`;
+          }).join('')}
+        </div>
+      </div>
+      <div class="lobby-buttons">
+        <button class="btn btn-back" onclick="window.leaveOnlineGame()">← LEAVE</button>
+        ${onlineIsHost && totalCount < maxSeats
+          ? `<button class="btn btn-secondary" onclick="window.addAiSeat()">🤖 ADD AI</button>`
+          : ''}
+        ${canDeal
+          ? `<button class="btn btn-primary" onclick="window.dealOnlineHand()">🎰 DEAL 'EM →</button>`
+          : ''}
+      </div>
+      ${!onlineIsHost ? '<div class="lobby-hint">Waiting for the host to deal…</div>' : ''}
+    </div>
+  `;
+}
+
+function renderJoin() {
+  const body = $('lobby-body');
+  if (!body) return;
   body.innerHTML = `
     <div class="lobby-menu">
       <div class="lobby-row">
-        <label class="setup-label">YOUR NAME</label>
-        <input type="text" id="online-name" class="setup-input" value="Stranger" maxlength="16">
-      </div>
-      <div class="lobby-row setup-row-avatars">
-        <label class="setup-label">YOUR LOOK</label>
-        ${avatarGalleryHtml(setupAvatarId)}
-      </div>
-      <div class="lobby-row setup-row-decks">
-        <label class="setup-label">YOUR DECK</label>
-        ${deckGalleryHtml(setupDeckId)}
+        <label class="setup-label">ROOM CODE</label>
+        <input type="text" id="join-code-input" class="setup-input code-input" maxlength="4" placeholder="ABCD" autocapitalize="characters" spellcheck="false">
+        <div class="lobby-hint">Ask the host for the 4-letter code.</div>
       </div>
       <div class="lobby-buttons">
-        <button class="btn btn-primary" onclick="window.hostGame()">🏠 HOST GAME</button>
-        <button class="btn btn-secondary" onclick="window.showJoin()">🚪 JOIN GAME</button>
         <button class="btn btn-back" onclick="window.showTitle()">← BACK</button>
-      </div>
-      <div id="join-section" style="display:none;">
-        <div class="lobby-row">
-          <label class="setup-label">ROOM CODE</label>
-          <input type="text" id="room-code-input" class="setup-input code-input" maxlength="4" placeholder="ABCD">
-        </div>
-        <button class="btn btn-primary" onclick="window.doJoin()">JOIN →</button>
+        <button class="btn btn-primary" onclick="window.joinOnlineByCode()">JOIN →</button>
       </div>
     </div>
   `;
-  wireAvatarGallery(body, id => { setupAvatarId = id; });
-  wireDeckGallery(body, id => { setupDeckId = id; });
-}
-
-window.showJoin = () => {
-  $('join-section').style.display = 'block';
-};
-
-window.hostGame = async () => {
-  const name = ($('online-name')?.value || 'Stranger').trim() || 'Stranger';
-  try {
-    roomCode = await createRoom(name, setupAvatarId);
-    listenRoom(onRoomUpdate);
-    renderLobbyRoom();
-  } catch (e) {
-    alert('Error creating room: ' + e.message);
-  }
-};
-
-window.doJoin = async () => {
-  const name = ($('online-name')?.value || 'Stranger').trim() || 'Stranger';
-  const code = ($('room-code-input')?.value || '').trim().toUpperCase();
-  if (code.length !== 4) { alert('Enter a 4-letter room code'); return; }
-  try {
-    roomCode = code;
-    await joinRoom(code, name, setupAvatarId);
-    listenRoom(onRoomUpdate);
-    renderLobbyRoom();
-  } catch (e) {
-    alert(e.message);
-  }
-};
-
-function renderLobbyRoom() {
-  const body = $('lobby-body');
-  const rd = roomData || {};
-  const players = rd.players || {};
-  const playerList = Object.entries(players);
-  const amHost = rd.host === myClientId;
-
-  body.innerHTML = `
-    <div class="lobby-room">
-      <div class="room-code-display">Room: <span class="room-code">${roomCode}</span></div>
-      <div class="player-list">
-        <div class="lobby-label">PLAYERS AT THE TABLE</div>
-        ${playerList.map(([cid, p]) => `
-          <div class="lobby-player ${p.ready ? 'ready' : ''}">
-            ${avatarMarkup(p.avatar, 'avatar-sm')}
-            <span class="lobby-player-name">${p.name}${cid === rd.host ? ' ★' : ''}</span>
-            <span class="lobby-player-status">${p.ready ? '✓ READY' : 'WAITING'}</span>
-          </div>
-        `).join('')}
-      </div>
-      <div class="lobby-actions">
-        ${!players[myClientId]?.ready ?
-          `<button class="btn btn-primary" onclick="window.markReady()">✋ I'M READY</button>` :
-          `<div class="ready-badge">YOU'RE READY</div>`
-        }
-        ${amHost && playerList.length >= 2 && playerList.every(([,p]) => p.ready) ?
-          `<button class="btn btn-primary" onclick="window.launchOnline()">🎰 DEAL 'EM!</button>` : ''
-        }
-      </div>
-      <div class="lobby-hint">${amHost ? 'Share the room code with your posse.' : 'Waiting for the host to start...'}</div>
-    </div>
-  `;
-}
-
-window.markReady = () => setReady(true);
-
-window.launchOnline = async () => {
-  const rd = roomData;
-  const entries = Object.entries(rd.players || {});
-  const players = entries.map(([cid, p], i) => ({
-    name: p.name,
-    isAI: false,
-    avatar: p.avatar || null,
-    clientId: cid,
-    seatIndex: i,
-  }));
-  G = createGame(players);
-  G.clientMap = {};
-  entries.forEach(([cid], i) => { G.clientMap[cid] = i; });
-  gameStart = Date.now();
-  blindLevel = 0;
-  G = startHand(G);
-  isOnline = true;
-  scored = false;
-  setDeckBack(setupDeckId);
-  seq++;
-  await startOnlineGame();
-  await pushGameState(G, seq);
-};
-
-function onRoomUpdate(data) {
-  roomData = data;
-  if (!data) return;
-
-  if (data.started && data.state) {
-    const parsed = typeof data.state === 'string' ? JSON.parse(data.state) : data.state;
-    if (data.seq > seq || !G) {
-      seq = data.seq || 0;
-      G = parsed;
-      isOnline = true;
-      setDeckBack(setupDeckId);
-      switchScreen('game-screen');
-      renderGame();
-      if (isGameOver(G)) showGameOver();
-      else checkAITurn();
-    }
-  } else if (!data.started) {
-    renderLobbyRoom();
-  }
-
-  if (data.pendingAction && data.pendingAction.from !== myClientId && G) {
-    const action = data.pendingAction;
-    if (isHost(data)) {
-      G = applyAction(G, action);
-      seq++;
-      clearAction();
-      pushGameState(G, seq);
-      renderGame();
-      checkAITurn();
-    }
+  const input = $('join-code-input');
+  if (input) {
+    input.oninput = e => { e.target.value = e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 4); };
+    input.focus();
   }
 }
 
@@ -373,16 +590,10 @@ function beginHand() {
 }
 
 function checkAITurn() {
+  if (mode === 'online') return;   // online AI is driven by driveOnlineAiTurn on snapshots
   if (!G || isHandOver(G)) return;
   const player = G.players[G.activeIndex];
   if (!player) return;
-
-  if (isOnline) {
-    const mySeat = G.clientMap?.[myClientId];
-    if (G.activeIndex !== mySeat) return;
-    renderGame();
-    return;
-  }
 
   if (player.isAI) {
     clearTimeout(aiTimer);
@@ -434,7 +645,7 @@ function recordWinIfMine(winner) {
   if (scored) return;
   scored = true;
   if (!winner) return;
-  const mine = isOnline ? (G.clientMap?.[myClientId] === winner.id) : !winner.isAI;
+  const mine = mode === 'online' ? (winner.uid === onlineMyUid) : !winner.isAI;
   const net = winner.chips - STARTING_CHIPS;
   if (mine && net > 0) recordWin(winner.name, net);
 }
@@ -473,6 +684,12 @@ function escapeHtml(s) {
 
 window.continueGame = () => {
   clearTimeout(revealTimer);
+  if (mode === 'online') {
+    if (!onlineIsHost) return;   // only host can start next hand
+    if (isGameOver(G)) { showGameOver(); return; }
+    Online.startHand(onlineGameId).catch(e => alert('Next hand failed: ' + (e.message || e)));
+    return;
+  }
   if (isGameOver(G)) {
     showGameOver();
   } else {
@@ -497,8 +714,12 @@ function playerAct(action) {
   const player = G.players[G.activeIndex];
   if (player.isAI) return;
 
-  if (isOnline) {
-    pushAction(action);
+  if (mode === 'online') {
+    // Online: send to server; wait for snapshot to re-render.
+    const srvAction = action.action === 'all-in' ? 'all_in' : action.action;
+    const amount = action.action === 'raise' ? (action.amount | 0) : 0;
+    Online.playerAction(onlineGameId, srvAction, amount)
+      .catch(e => alert('Action failed: ' + (e.message || e)));
     return;
   }
 
@@ -554,10 +775,8 @@ function renderPlayers() {
   const area = $('players-area');
   area.innerHTML = '';
 
-  const myIndex = isOnline ? (G.clientMap?.[myClientId] ?? 0) : 0;
-
   G.players.forEach((p, i) => {
-    const isMe = isOnline ? (G.clientMap?.[myClientId] === i) : !p.isAI;
+    const isMe = mode === 'online' ? (p.uid === onlineMyUid) : !p.isAI;
     const isActive = G.activeIndex === i && !isHandOver(G);
     const showCards = isMe || (isHandOver(G) && pendingReveal && !p.folded);
 
@@ -634,7 +853,9 @@ function renderActions() {
 
   // The betting menu stays put: it's shown for the human every turn and just
   // disabled (greyed) while we wait on someone else — never removed.
-  const mySeat = isOnline ? (G.clientMap?.[myClientId] ?? 0) : G.players.findIndex(p => !p.isAI);
+  const mySeat = mode === 'online'
+    ? G.players.findIndex(p => p.uid === onlineMyUid)
+    : G.players.findIndex(p => !p.isAI);
   const me = G.players[mySeat];
   const activePlayer = G.players[G.activeIndex];
   const myTurn = !!me && G.activeIndex === mySeat && !me.folded && !me.allIn;
