@@ -920,9 +920,10 @@ function renderOddsPanel() {
   if (!list) return;
 
   // Static prior odds — always visible.
-  list.querySelectorAll('li').forEach(li => {
-    const r = parseInt(li.dataset.rank, 10);
-    const oddsCell = li.querySelector('.hr-odds');
+  const rows = list.querySelectorAll('tr[data-rank]');
+  rows.forEach(row => {
+    const r = parseInt(row.dataset.rank, 10);
+    const oddsCell = row.querySelector('.hr-odds');
     if (oddsCell && oddsCell.textContent === '') {
       oddsCell.textContent = fmtPct(STATIC_ODDS[r]);
     }
@@ -936,9 +937,9 @@ function renderOddsPanel() {
   const hole = myHoleCards();
   const community = (G && G.communityCards) || [];
   const dist = hole && community.length >= 3 ? computeMyOdds(hole, community) : null;
-  list.querySelectorAll('li').forEach(li => {
-    const r = parseInt(li.dataset.rank, 10);
-    const cell = li.querySelector('.hr-my');
+  rows.forEach(row => {
+    const r = parseInt(row.dataset.rank, 10);
+    const cell = row.querySelector('.hr-my');
     if (!cell) return;
     if (!dist) { cell.textContent = '—'; return; }
     cell.textContent = fmtPct(dist[r]);
