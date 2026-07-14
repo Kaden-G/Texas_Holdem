@@ -521,6 +521,24 @@ function stateFromDoc(doc) {
 // AI turns if we're the host.
 function applyOnlineSnapshot() {
   if (mode !== 'online' || !onlineDoc) return;
+  // Server can reassign hostUid (e.g. when the current host busts and
+  // "Next Hand" control transfers to another human). Recompute on every
+  // snapshot instead of trusting the value set at connect time.
+  const wasHost = onlineIsHost;
+  onlineIsHost = !!(onlineMyUid && onlineDoc.hostUid === onlineMyUid);
+  // Attach/detach the aiHands subscription to match. Firestore rules
+  // reject reads unless we're the current host, so we only sub when we
+  // actually become host.
+  if (onlineIsHost && !unsubAiHands) {
+    unsubAiHands = Online.subscribeAiHands(onlineGameId, (bySeat) => {
+      onlineAiHands = bySeat;
+      applyOnlineSnapshot();
+    });
+  } else if (!onlineIsHost && unsubAiHands) {
+    try { unsubAiHands(); } catch (_) {}
+    unsubAiHands = null;
+    onlineAiHands = {};
+  }
   // Accumulate saloon-talk log by diffing consecutive game-doc snapshots.
   // Runs before stateFromDoc so G.log reflects the latest events.
   if (onlinePrevDoc !== onlineDoc) {

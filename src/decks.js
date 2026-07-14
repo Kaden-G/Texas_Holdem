@@ -20,6 +20,7 @@ const DECK_NAMES = [
   'Tall Timbers',         // 12 — lone rider among the redwoods
   'Frontier Map',         // 13 — old parchment territory map
   "Walter's Pick",        // 14 — seahawk / hawk crest
+  "Ronan's Ride",         // 15 — red 1958 Corvette convertible in the desert
 ];
 
 export const DECKS = DECK_NAMES.map((name, i) => {

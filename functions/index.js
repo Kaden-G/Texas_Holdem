@@ -480,12 +480,40 @@ function applyEndOfHand(g, { winners, revealed }) {
   g.pot = 0;
   g.currentBet = 0;
   g.actionSeat = -1;
+  // If the current host busted, hand the "Next Hand" control to another
+  // human still in the game. Never to an AI — bots can't click. Walk
+  // clockwise from the busted host so the transfer is deterministic.
+  reassignHostIfNeeded(g);
   // Host must call startHand to move to next; we leave phase='showdown'
   // and expose the reveal.
   const alive = livingSeats(g.seats).filter(s => g.seats[s.seat].stack > 0);
   if (alive.length < 2) {
     g.status = 'finished';
   }
+}
+
+// Transfer host to the next non-AI seat with chips, clockwise from the
+// current host's seat. No-op if the current host is still solvent, or
+// if no other human is eligible (leaves hostUid alone — game likely ends
+// anyway when <2 alive).
+function reassignHostIfNeeded(g) {
+  if (!g.hostUid || !g.seats) return;
+  const seatEntries = Object.keys(g.seats).map(k => ({ idx: parseInt(k, 10), s: g.seats[k] }));
+  const host = seatEntries.find(e => e.s.uid === g.hostUid);
+  if (!host) return;
+  if (host.s.stack > 0 && host.s.status !== 'busted') return;   // still fine
+  const maxSeats = g.settings.maxPlayers;
+  for (let step = 1; step <= maxSeats; step++) {
+    const idx = (host.idx + step) % maxSeats;
+    const s = g.seats[idx];
+    if (!s) continue;
+    if (s.isAI) continue;
+    if ((s.stack | 0) <= 0) continue;
+    if (s.status === 'busted') continue;
+    g.hostUid = s.uid;
+    return;
+  }
+  // No eligible human — leave hostUid alone; game will finish anyway.
 }
 
 function gameUpdatePayload(g) {
@@ -502,6 +530,7 @@ function gameUpdatePayload(g) {
     actionSeat: g.actionSeat,
     lastAction: g.lastAction || null,
     showdown: g.showdown || null,
+    hostUid: g.hostUid,
     updatedAt: FieldValue.serverTimestamp(),
   };
   return payload;
