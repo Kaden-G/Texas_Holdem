@@ -945,12 +945,14 @@ body {
 }
 .hand-ranks li {
   display: flex;
-  justify-content: space-between;
   align-items: baseline;
   gap: 8px;
   padding: 3px 0;
   border-bottom: 1px dashed rgba(201,168,76,0.13);
 }
+/* Push the odds group to the right edge; baseline % and your %
+   sit tight next to each other with a small gap between them. */
+.hand-ranks .hr-odds { margin-left: auto; }
 .hr-name {
   font-family: 'IM Fell English SC', serif;
   font-size: 17px;
@@ -980,18 +982,18 @@ body {
   font-variant-numeric: tabular-nums;
   font-feature-settings: "tnum" 1;
   white-space: nowrap;
-  min-width: 5.5em;
+  min-width: 4em;
   text-align: right;
   letter-spacing: 0.02em;
 }
 .hr-odds {
-  font-size: 22px;
+  font-size: 18px;
   font-weight: 500;
   color: rgba(232, 210, 154, 0.85);
 }
 .hr-my {
   display: none;
-  font-size: 24px;
+  font-size: 20px;
   font-weight: 700;
   color: var(--saloon-gold);
 }
