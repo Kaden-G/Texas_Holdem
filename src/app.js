@@ -578,14 +578,35 @@ async function driveOnlineAiTurn() {
           minRaise: G.minRaise,
         },
       );
+      // Sanitize the decision against current server state before sending.
+      // aiDecision's premium/strong-hand paths can fall through to 'call'
+      // even when nothing has been bet this street — server would reject
+      // ("Nothing to call — use check") and no new snapshot would arrive
+      // to retry, hanging the game.
       let action = decision.action === 'all-in' ? 'all_in' : decision.action;
       let amount = 0;
+      const toCall = Math.max(0, (G.currentBet | 0) - (active.currentBet | 0));
+      if (action === 'call' && toCall === 0) action = 'check';
+      if (action === 'check' && toCall > 0) action = 'call';
       if (decision.action === 'raise') {
         amount = G.currentBet + (decision.amount || G.minRaise);
         // Postflop with no prior bet, the AI's "raise" is server-side a "bet".
         if ((G.currentBet | 0) === 0) action = 'bet';
       }
-      await Online.playerAction(onlineGameId, action, amount);
+      try {
+        await Online.playerAction(onlineGameId, action, amount);
+      } catch (e) {
+        // Anything the sanitizer missed: degrade to the safest legal move
+        // rather than hang. Check if we can, else fold — folding is always
+        // legal and lets the hand progress.
+        console.warn('AI action rejected, falling back', action, e.message || e);
+        const fallback = toCall === 0 ? 'check' : 'fold';
+        try {
+          await Online.playerAction(onlineGameId, fallback, 0);
+        } catch (e2) {
+          console.error('AI fallback also failed', e2);
+        }
+      }
     } catch (e) {
       console.error('AI action failed', e);
     } finally {
