@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>DEAD HAND SALOON — Texas Hold'em</title>
-<link rel="stylesheet" href="styles.css?v=20">
+<link rel="stylesheet" href="styles.css?v=21">
 </head>
 <body>
 
@@ -97,18 +97,27 @@
           <span>Show my odds</span>
         </label>
       </div>
-      <ol class="hand-ranks" id="hand-ranks-list">
-        <li data-rank="9"><span class="hr-name">Royal Flush</span><span class="hr-ex">A K Q J 10 <i class="s-red">&hearts;</i></span><span class="hr-odds"></span><span class="hr-my"></span></li>
-        <li data-rank="8"><span class="hr-name">Straight Flush</span><span class="hr-ex">9 8 7 6 5 &spades;</span><span class="hr-odds"></span><span class="hr-my"></span></li>
-        <li data-rank="7"><span class="hr-name">Four of a Kind</span><span class="hr-ex">Q Q Q Q</span><span class="hr-odds"></span><span class="hr-my"></span></li>
-        <li data-rank="6"><span class="hr-name">Full House</span><span class="hr-ex">K K K 2 2</span><span class="hr-odds"></span><span class="hr-my"></span></li>
-        <li data-rank="5"><span class="hr-name">Flush</span><span class="hr-ex">A J 8 5 2 <i class="s-red">&diams;</i></span><span class="hr-odds"></span><span class="hr-my"></span></li>
-        <li data-rank="4"><span class="hr-name">Straight</span><span class="hr-ex">10 9 8 7 6</span><span class="hr-odds"></span><span class="hr-my"></span></li>
-        <li data-rank="3"><span class="hr-name">Three of a Kind</span><span class="hr-ex">7 7 7</span><span class="hr-odds"></span><span class="hr-my"></span></li>
-        <li data-rank="2"><span class="hr-name">Two Pair</span><span class="hr-ex">A A 9 9</span><span class="hr-odds"></span><span class="hr-my"></span></li>
-        <li data-rank="1"><span class="hr-name">One Pair</span><span class="hr-ex">J J</span><span class="hr-odds"></span><span class="hr-my"></span></li>
-        <li data-rank="0"><span class="hr-name">High Card</span><span class="hr-ex">A high</span><span class="hr-odds"></span><span class="hr-my"></span></li>
-      </ol>
+      <table class="hand-ranks" id="hand-ranks-list">
+        <colgroup>
+          <col class="hr-col-num">
+          <col class="hr-col-name">
+          <col class="hr-col-ex">
+          <col class="hr-col-odds">
+          <col class="hr-col-my">
+        </colgroup>
+        <tbody>
+          <tr data-rank="9"><td class="hr-num">1.</td><td class="hr-name">Royal Flush</td><td class="hr-ex">A K Q J 10 <i class="s-red">&hearts;</i></td><td class="hr-odds"></td><td class="hr-my"></td></tr>
+          <tr data-rank="8"><td class="hr-num">2.</td><td class="hr-name">Straight Flush</td><td class="hr-ex">9 8 7 6 5 &spades;</td><td class="hr-odds"></td><td class="hr-my"></td></tr>
+          <tr data-rank="7"><td class="hr-num">3.</td><td class="hr-name">Four of a Kind</td><td class="hr-ex">Q Q Q Q</td><td class="hr-odds"></td><td class="hr-my"></td></tr>
+          <tr data-rank="6"><td class="hr-num">4.</td><td class="hr-name">Full House</td><td class="hr-ex">K K K 2 2</td><td class="hr-odds"></td><td class="hr-my"></td></tr>
+          <tr data-rank="5"><td class="hr-num">5.</td><td class="hr-name">Flush</td><td class="hr-ex">A J 8 5 2 <i class="s-red">&diams;</i></td><td class="hr-odds"></td><td class="hr-my"></td></tr>
+          <tr data-rank="4"><td class="hr-num">6.</td><td class="hr-name">Straight</td><td class="hr-ex">10 9 8 7 6</td><td class="hr-odds"></td><td class="hr-my"></td></tr>
+          <tr data-rank="3"><td class="hr-num">7.</td><td class="hr-name">Three of a Kind</td><td class="hr-ex">7 7 7</td><td class="hr-odds"></td><td class="hr-my"></td></tr>
+          <tr data-rank="2"><td class="hr-num">8.</td><td class="hr-name">Two Pair</td><td class="hr-ex">A A 9 9</td><td class="hr-odds"></td><td class="hr-my"></td></tr>
+          <tr data-rank="1"><td class="hr-num">9.</td><td class="hr-name">One Pair</td><td class="hr-ex">J J</td><td class="hr-odds"></td><td class="hr-my"></td></tr>
+          <tr data-rank="0"><td class="hr-num">10.</td><td class="hr-name">High Card</td><td class="hr-ex">A high</td><td class="hr-odds"></td><td class="hr-my"></td></tr>
+        </tbody>
+      </table>
       <div class="odds-legend">
         <div class="odds-legend-row">
           <span class="odds-legend-swatch odds-legend-swatch--static"></span>
@@ -135,6 +144,6 @@
   </div>
 </div>
 
-<script type="module" src="src/app.js?v=20"></script>
+<script type="module" src="src/app.js?v=21"></script>
 </body>
 </html>

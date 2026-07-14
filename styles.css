@@ -938,34 +938,39 @@ body {
 }
 .log-talk { border-bottom: 2px solid var(--saloon-brass); }
 
-/* Hand-ranking reference */
+/* Hand-ranking reference — table layout so columns line up cleanly and
+   the whole thing fits within the panel width without a horizontal
+   scroll bar. */
 .hand-ranks {
-  list-style: none;
-  counter-reset: hr;
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: auto;
 }
-.hand-ranks li {
-  display: flex;
-  align-items: baseline;
-  gap: 8px;
-  padding: 3px 0;
+.hand-ranks td {
+  padding: 3px 4px;
+  vertical-align: baseline;
   border-bottom: 1px dashed rgba(201,168,76,0.13);
 }
-/* Push the odds group to the right edge; baseline % and your %
-   sit tight next to each other with a small gap between them. */
-.hand-ranks .hr-odds { margin-left: auto; }
+.hr-col-num  { width: 2.2em; }
+.hr-col-name { width: auto; }
+.hr-col-ex   { width: auto; }
+.hr-col-odds { width: 4em; }
+/* .hr-col-my width applied only when the my-odds toggle is on so the
+   column doesn't reserve space when hidden. */
+.hand-ranks.show-my-odds .hr-col-my { width: 4em; }
+.hr-num {
+  color: var(--saloon-gold);
+  font-size: 13px;
+  text-align: right;
+  padding-right: 2px;
+}
 .hr-name {
   font-family: 'IM Fell English SC', serif;
-  font-size: 17px;
+  font-size: 16px;
   color: var(--saloon-cream);
 }
-.hr-name::before {
-  counter-increment: hr;
-  content: counter(hr) ". ";
-  color: var(--saloon-gold);
-  font-size: 14px;
-}
 .hr-ex {
-  font-size: 15px;
+  font-size: 14px;
   color: var(--text-dim);
   white-space: nowrap;
   letter-spacing: 1px;
@@ -974,30 +979,28 @@ body {
 
 /* Odds columns. Static odds (.hr-odds) always visible; live per-player
    odds (.hr-my) only when the panel has .show-my-odds. Numeric font is
-   system-ui with tabular figures — a decimal point cannot be mistaken
-   for a zero at this size. */
+   system-ui with tabular figures so decimals stay unambiguous. */
 .hr-odds,
 .hr-my {
   font-family: system-ui, -apple-system, "Segoe UI", "SF Pro Text", sans-serif;
   font-variant-numeric: tabular-nums;
   font-feature-settings: "tnum" 1;
   white-space: nowrap;
-  min-width: 4em;
   text-align: right;
   letter-spacing: 0.02em;
 }
 .hr-odds {
-  font-size: 18px;
+  font-size: 16px;
   font-weight: 500;
   color: rgba(232, 210, 154, 0.85);
 }
 .hr-my {
   display: none;
-  font-size: 20px;
+  font-size: 18px;
   font-weight: 700;
   color: var(--saloon-gold);
 }
-.hand-ranks.show-my-odds .hr-my { display: inline-block; }
+.hand-ranks.show-my-odds .hr-my { display: table-cell; }
 
 /* Explanatory legend below the panel — makes clear what each column
    means so the numbers aren't ambiguous. Row for "your %" is hidden
