@@ -373,13 +373,22 @@ window.joinOnlineByCode = async () => {
 
 window.addAiSeat = async () => {
   if (!onlineGameId || !onlineIsHost) return;
-  // Fill the next open seat with a themed AI.
+  // Fill the next open seat with a themed AI. Avoid duplicate avatars and
+  // duplicate display names — getAIPersonalities re-shuffles its pool per
+  // call so consecutive single-picks can collide.
   const seatsMap = onlineDoc?.seats || {};
-  const taken = new Set(Object.values(seatsMap).map(s => s.avatarId).filter(Boolean));
-  const remaining = AVATARS.filter(a => !taken.has(a.id));
+  const takenAvatars = new Set(Object.values(seatsMap).map(s => s.avatarId).filter(Boolean));
+  const takenNames = new Set(Object.values(seatsMap).map(s => (s.displayName || '').toLowerCase()));
+  const remaining = AVATARS.filter(a => !takenAvatars.has(a.id));
   if (!remaining.length) return;
   const pick = remaining[Math.floor(Math.random() * remaining.length)];
-  const personality = getAIPersonalities([pick.gender])[0];
+  // Try up to 8 personality draws to dodge a name collision, then fall
+  // back to whatever came last (extremely unlikely to matter).
+  let personality;
+  for (let i = 0; i < 8; i++) {
+    personality = getAIPersonalities([pick.gender])[0];
+    if (!takenNames.has(personality.name.toLowerCase())) break;
+  }
   try {
     await Online.addAiSeat(onlineGameId, {
       displayName: personality.name,
@@ -569,9 +578,13 @@ async function driveOnlineAiTurn() {
           minRaise: G.minRaise,
         },
       );
-      const action = decision.action === 'all-in' ? 'all_in' : decision.action;
+      let action = decision.action === 'all-in' ? 'all_in' : decision.action;
       let amount = 0;
-      if (decision.action === 'raise') amount = G.currentBet + (decision.amount || G.minRaise);
+      if (decision.action === 'raise') {
+        amount = G.currentBet + (decision.amount || G.minRaise);
+        // Postflop with no prior bet, the AI's "raise" is server-side a "bet".
+        if ((G.currentBet | 0) === 0) action = 'bet';
+      }
       await Online.playerAction(onlineGameId, action, amount);
     } catch (e) {
       console.error('AI action failed', e);
@@ -808,8 +821,14 @@ function playerAct(action) {
 
   if (mode === 'online') {
     // Online: send to server; wait for snapshot to re-render.
-    const srvAction = action.action === 'all-in' ? 'all_in' : action.action;
-    const amount = action.action === 'raise' ? (action.amount | 0) : 0;
+    // Server distinguishes 'bet' (opening a street) from 'raise'
+    // (increasing a prior bet); the single-player button labels everything
+    // aggressive as "RAISE", so translate at the boundary. Slider's value
+    // is already the total commitment for the street, which is what both
+    // 'bet' and 'raise' amounts represent server-side.
+    let srvAction = action.action === 'all-in' ? 'all_in' : action.action;
+    let amount = action.action === 'raise' ? (action.amount | 0) : 0;
+    if (srvAction === 'raise' && (G.currentBet | 0) === 0) srvAction = 'bet';
     Online.playerAction(onlineGameId, srvAction, amount)
       .catch(e => alert('Action failed: ' + (e.message || e)));
     return;
