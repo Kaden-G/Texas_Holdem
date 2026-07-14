@@ -94,6 +94,93 @@ function teardownOnline() {
   onlineMyHand = null;
   onlineAiHands = {};
   onlineIsHost = false;
+  onlineLog = [];
+  onlinePrevDoc = null;
+}
+
+// ── Saloon Talk log for online mode ──
+// Server publishes `lastAction`, phase transitions, showdown winners, etc.
+// on every game doc update; we diff consecutive snapshots and append log
+// entries in the same shape single-player uses so renderLog() renders both
+// modes identically.
+let onlineLog = [];
+let onlinePrevDoc = null;
+
+const _ACTION_LABEL = {
+  fold: 'folds',
+  check: 'checks',
+  call: 'calls',
+  bet: 'bets',
+  raise: 'raises to',
+  all_in: 'goes all-in',
+};
+
+function _nameForUid(doc, uid) {
+  if (!doc || !doc.seats || !uid) return 'stranger';
+  for (const k of Object.keys(doc.seats)) {
+    if (doc.seats[k].uid === uid) return doc.seats[k].displayName || 'stranger';
+  }
+  return 'stranger';
+}
+
+function deriveOnlineLog(prev, next) {
+  if (!next) return;
+
+  // New hand: banner + blinds.
+  const prevHand = prev?.handNumber || 0;
+  if (next.handNumber && next.handNumber !== prevHand) {
+    onlineLog.push({ type: 'phase', phase: `HAND #${next.handNumber}` });
+    const sb = next.settings?.smallBlind || 10;
+    const bb = next.settings?.bigBlind || 20;
+    const seats = next.seats || {};
+    // Walk seats clockwise from dealer to emit SB before BB.
+    const dealer = next.dealerSeat ?? 0;
+    const maxSeats = next.settings?.maxPlayers || 6;
+    for (let step = 1; step <= maxSeats; step++) {
+      const idx = (dealer + step) % maxSeats;
+      const s = seats[idx];
+      if (!s) continue;
+      const c = s.committedThisStreet || 0;
+      if (c === sb) onlineLog.push({ type: 'blind', player: s.displayName, kind: 'small', amount: sb });
+      else if (c === bb) onlineLog.push({ type: 'blind', player: s.displayName, kind: 'big', amount: bb });
+    }
+    onlinePrevDoc = next;
+    return;
+  }
+
+  // Phase change → banner.
+  if (prev && prev.phase !== next.phase && ['flop', 'turn', 'river'].includes(next.phase)) {
+    onlineLog.push({ type: 'phase', phase: next.phase });
+  }
+
+  // Player action (skip 'system' / 'deal').
+  const la = next.lastAction;
+  const pa = prev?.lastAction;
+  if (la && la.uid && la.uid !== 'system' && la.type) {
+    const changed = !pa || pa.uid !== la.uid || pa.type !== la.type || (pa.amount || 0) !== (la.amount || 0);
+    if (changed) {
+      const name = _nameForUid(next, la.uid);
+      const action = _ACTION_LABEL[la.type] || la.type;
+      const amount = ['bet', 'raise', 'all_in'].includes(la.type) ? (la.amount || 0) : 0;
+      onlineLog.push({ type: 'action', player: name, action, amount });
+    }
+  }
+
+  // Winners: appeared on this snapshot.
+  const prevWin = prev?.showdown?.winners;
+  const nextWin = next.showdown?.winners;
+  if (nextWin && nextWin.length && !(prevWin && prevWin.length)) {
+    for (const w of nextWin) {
+      onlineLog.push({
+        type: 'win',
+        player: _nameForUid(next, w.uid),
+        amount: w.amount,
+        hand: w.handRank || 'the pot',
+      });
+    }
+  }
+
+  onlinePrevDoc = next;
 }
 
 // ── SETUP (single player) ──
@@ -413,7 +500,7 @@ function stateFromDoc(doc) {
     dealerIndex: dealerIndex === -1 ? 0 : dealerIndex,
     roundNum: doc.handNumber || 0,
     winners: winnersArr,
-    log: [],   // TODO: derive from lastAction / phase in a follow-up
+    log: onlineLog,
     _online: true,
     _phaseRaw: doc.phase,
     _handOver: doc.phase === 'between_hands' || doc.phase === 'showdown',
@@ -424,6 +511,11 @@ function stateFromDoc(doc) {
 // AI turns if we're the host.
 function applyOnlineSnapshot() {
   if (mode !== 'online' || !onlineDoc) return;
+  // Accumulate saloon-talk log by diffing consecutive game-doc snapshots.
+  // Runs before stateFromDoc so G.log reflects the latest events.
+  if (onlinePrevDoc !== onlineDoc) {
+    deriveOnlineLog(onlinePrevDoc, onlineDoc);
+  }
   // In lobby (waiting or between hands with no cards yet): show the lobby.
   const currentScreen = document.querySelector('.screen.active')?.id || '';
   const preGame = onlineDoc.status === 'waiting'
