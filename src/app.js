@@ -94,6 +94,93 @@ function teardownOnline() {
   onlineMyHand = null;
   onlineAiHands = {};
   onlineIsHost = false;
+  onlineLog = [];
+  onlinePrevDoc = null;
+}
+
+// ── Saloon Talk log for online mode ──
+// Server publishes `lastAction`, phase transitions, showdown winners, etc.
+// on every game doc update; we diff consecutive snapshots and append log
+// entries in the same shape single-player uses so renderLog() renders both
+// modes identically.
+let onlineLog = [];
+let onlinePrevDoc = null;
+
+const _ACTION_LABEL = {
+  fold: 'folds',
+  check: 'checks',
+  call: 'calls',
+  bet: 'bets',
+  raise: 'raises to',
+  all_in: 'goes all-in',
+};
+
+function _nameForUid(doc, uid) {
+  if (!doc || !doc.seats || !uid) return 'stranger';
+  for (const k of Object.keys(doc.seats)) {
+    if (doc.seats[k].uid === uid) return doc.seats[k].displayName || 'stranger';
+  }
+  return 'stranger';
+}
+
+function deriveOnlineLog(prev, next) {
+  if (!next) return;
+
+  // New hand: banner + blinds.
+  const prevHand = prev?.handNumber || 0;
+  if (next.handNumber && next.handNumber !== prevHand) {
+    onlineLog.push({ type: 'phase', phase: `HAND #${next.handNumber}` });
+    const sb = next.settings?.smallBlind || 10;
+    const bb = next.settings?.bigBlind || 20;
+    const seats = next.seats || {};
+    // Walk seats clockwise from dealer to emit SB before BB.
+    const dealer = next.dealerSeat ?? 0;
+    const maxSeats = next.settings?.maxPlayers || 6;
+    for (let step = 1; step <= maxSeats; step++) {
+      const idx = (dealer + step) % maxSeats;
+      const s = seats[idx];
+      if (!s) continue;
+      const c = s.committedThisStreet || 0;
+      if (c === sb) onlineLog.push({ type: 'blind', player: s.displayName, kind: 'small', amount: sb });
+      else if (c === bb) onlineLog.push({ type: 'blind', player: s.displayName, kind: 'big', amount: bb });
+    }
+    onlinePrevDoc = next;
+    return;
+  }
+
+  // Phase change → banner.
+  if (prev && prev.phase !== next.phase && ['flop', 'turn', 'river'].includes(next.phase)) {
+    onlineLog.push({ type: 'phase', phase: next.phase });
+  }
+
+  // Player action (skip 'system' / 'deal').
+  const la = next.lastAction;
+  const pa = prev?.lastAction;
+  if (la && la.uid && la.uid !== 'system' && la.type) {
+    const changed = !pa || pa.uid !== la.uid || pa.type !== la.type || (pa.amount || 0) !== (la.amount || 0);
+    if (changed) {
+      const name = _nameForUid(next, la.uid);
+      const action = _ACTION_LABEL[la.type] || la.type;
+      const amount = ['bet', 'raise', 'all_in'].includes(la.type) ? (la.amount || 0) : 0;
+      onlineLog.push({ type: 'action', player: name, action, amount });
+    }
+  }
+
+  // Winners: appeared on this snapshot.
+  const prevWin = prev?.showdown?.winners;
+  const nextWin = next.showdown?.winners;
+  if (nextWin && nextWin.length && !(prevWin && prevWin.length)) {
+    for (const w of nextWin) {
+      onlineLog.push({
+        type: 'win',
+        player: _nameForUid(next, w.uid),
+        amount: w.amount,
+        hand: w.handRank || 'the pot',
+      });
+    }
+  }
+
+  onlinePrevDoc = next;
 }
 
 // ── SETUP (single player) ──
@@ -286,13 +373,22 @@ window.joinOnlineByCode = async () => {
 
 window.addAiSeat = async () => {
   if (!onlineGameId || !onlineIsHost) return;
-  // Fill the next open seat with a themed AI.
+  // Fill the next open seat with a themed AI. Avoid duplicate avatars and
+  // duplicate display names — getAIPersonalities re-shuffles its pool per
+  // call so consecutive single-picks can collide.
   const seatsMap = onlineDoc?.seats || {};
-  const taken = new Set(Object.values(seatsMap).map(s => s.avatarId).filter(Boolean));
-  const remaining = AVATARS.filter(a => !taken.has(a.id));
+  const takenAvatars = new Set(Object.values(seatsMap).map(s => s.avatarId).filter(Boolean));
+  const takenNames = new Set(Object.values(seatsMap).map(s => (s.displayName || '').toLowerCase()));
+  const remaining = AVATARS.filter(a => !takenAvatars.has(a.id));
   if (!remaining.length) return;
   const pick = remaining[Math.floor(Math.random() * remaining.length)];
-  const personality = getAIPersonalities([pick.gender])[0];
+  // Try up to 8 personality draws to dodge a name collision, then fall
+  // back to whatever came last (extremely unlikely to matter).
+  let personality;
+  for (let i = 0; i < 8; i++) {
+    personality = getAIPersonalities([pick.gender])[0];
+    if (!takenNames.has(personality.name.toLowerCase())) break;
+  }
   try {
     await Online.addAiSeat(onlineGameId, {
       displayName: personality.name,
@@ -413,7 +509,7 @@ function stateFromDoc(doc) {
     dealerIndex: dealerIndex === -1 ? 0 : dealerIndex,
     roundNum: doc.handNumber || 0,
     winners: winnersArr,
-    log: [],   // TODO: derive from lastAction / phase in a follow-up
+    log: onlineLog,
     _online: true,
     _phaseRaw: doc.phase,
     _handOver: doc.phase === 'between_hands' || doc.phase === 'showdown',
@@ -424,6 +520,11 @@ function stateFromDoc(doc) {
 // AI turns if we're the host.
 function applyOnlineSnapshot() {
   if (mode !== 'online' || !onlineDoc) return;
+  // Accumulate saloon-talk log by diffing consecutive game-doc snapshots.
+  // Runs before stateFromDoc so G.log reflects the latest events.
+  if (onlinePrevDoc !== onlineDoc) {
+    deriveOnlineLog(onlinePrevDoc, onlineDoc);
+  }
   // In lobby (waiting or between hands with no cards yet): show the lobby.
   const currentScreen = document.querySelector('.screen.active')?.id || '';
   const preGame = onlineDoc.status === 'waiting'
@@ -477,9 +578,13 @@ async function driveOnlineAiTurn() {
           minRaise: G.minRaise,
         },
       );
-      const action = decision.action === 'all-in' ? 'all_in' : decision.action;
+      let action = decision.action === 'all-in' ? 'all_in' : decision.action;
       let amount = 0;
-      if (decision.action === 'raise') amount = G.currentBet + (decision.amount || G.minRaise);
+      if (decision.action === 'raise') {
+        amount = G.currentBet + (decision.amount || G.minRaise);
+        // Postflop with no prior bet, the AI's "raise" is server-side a "bet".
+        if ((G.currentBet | 0) === 0) action = 'bet';
+      }
       await Online.playerAction(onlineGameId, action, amount);
     } catch (e) {
       console.error('AI action failed', e);
@@ -716,8 +821,14 @@ function playerAct(action) {
 
   if (mode === 'online') {
     // Online: send to server; wait for snapshot to re-render.
-    const srvAction = action.action === 'all-in' ? 'all_in' : action.action;
-    const amount = action.action === 'raise' ? (action.amount | 0) : 0;
+    // Server distinguishes 'bet' (opening a street) from 'raise'
+    // (increasing a prior bet); the single-player button labels everything
+    // aggressive as "RAISE", so translate at the boundary. Slider's value
+    // is already the total commitment for the street, which is what both
+    // 'bet' and 'raise' amounts represent server-side.
+    let srvAction = action.action === 'all-in' ? 'all_in' : action.action;
+    let amount = action.action === 'raise' ? (action.amount | 0) : 0;
+    if (srvAction === 'raise' && (G.currentBet | 0) === 0) srvAction = 'bet';
     Online.playerAction(onlineGameId, srvAction, amount)
       .catch(e => alert('Action failed: ' + (e.message || e)));
     return;
