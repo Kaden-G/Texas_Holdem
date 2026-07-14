@@ -577,3 +577,37 @@ exports.leaveGame = onCall({ enforceAppCheck: false }, async (req) => {
   });
   return { ok: true };
 });
+
+// ---------- submitWin — Top Guns global leaderboard ----------
+//
+// Called by any authenticated client when they've won a game (single
+// player against AI, or online multiplayer). Accumulates the player's
+// net-profit winnings into two collections:
+//   /leaderboard/lifetime/entries/{key}
+//   /leaderboard/daily/{yyyy-mm-dd}/entries/{key}
+// Uses FieldValue.increment so concurrent writes from different clients
+// don't lose updates. Rules deny direct client writes to /leaderboard/**
+// — this callable is the only write path.
+exports.submitWin = onCall({ enforceAppCheck: false }, async (req) => {
+  requireAuth(req);
+  const rawName = String((req.data && req.data.name) || 'stranger').trim();
+  const name = rawName.slice(0, 40) || 'stranger';
+  const winnings = Math.max(0, Math.min(10_000_000, (req.data && req.data.winnings) | 0));
+  if (winnings <= 0) return { ok: true, recorded: false };
+  const key = name.toLowerCase().replace(/[^a-z0-9_-]/g, '_').slice(0, 40) || 'stranger';
+  const d = new Date();
+  const p = (n) => String(n).padStart(2, '0');
+  const today = `${d.getUTCFullYear()}-${p(d.getUTCMonth() + 1)}-${p(d.getUTCDate())}`;
+  const now = FieldValue.serverTimestamp();
+  const payload = {
+    name,
+    winnings: FieldValue.increment(winnings),
+    wins: FieldValue.increment(1),
+    updatedAt: now,
+  };
+  await Promise.all([
+    db.doc(`leaderboard/lifetime/entries/${key}`).set(payload, { merge: true }),
+    db.doc(`leaderboard/daily/${today}/entries/${key}`).set(payload, { merge: true }),
+  ]);
+  return { ok: true, recorded: true };
+});

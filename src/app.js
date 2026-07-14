@@ -559,6 +559,14 @@ function applyOnlineSnapshot() {
   if (currentScreen !== 'game-screen') switchScreen('game-screen');
   renderGame();
 
+  // Game finished on the server — surface the game-over overlay for
+  // EVERY player (not just the host), so losers see the result and the
+  // winner's browser records to Top Guns exactly once via the `scored`
+  // guard in recordWinIfMine.
+  if (onlineDoc.status === 'finished' && !scored) {
+    showGameOver();
+  }
+
   // Between-hands (finished hand): pause on the last hand's reveal.
   if (G._handOver) {
     pendingReveal = true;
@@ -786,13 +794,25 @@ function showGameOver() {
 
 // Record this game's result to the boards — but only my own human win, so
 // each finished game is counted exactly once (humans only, net profit).
+// Writes to BOTH the local per-browser board (works offline / without
+// Cloud Functions) and the global Top Guns board via submitWin. Losing
+// players don't record anything; winners write from their own browser.
 function recordWinIfMine(winner) {
   if (scored) return;
   scored = true;
   if (!winner) return;
   const mine = mode === 'online' ? (winner.uid === onlineMyUid) : !winner.isAI;
-  const net = winner.chips - STARTING_CHIPS;
-  if (mine && net > 0) recordWin(winner.name, net);
+  const startingStack = mode === 'online'
+    ? (onlineDoc?.settings?.startingStack || STARTING_CHIPS)
+    : STARTING_CHIPS;
+  const net = winner.chips - startingStack;
+  if (mine && net > 0) {
+    recordWin(winner.name, net);
+    // Global board — fire-and-forget; local record is our fallback.
+    Online.submitWin(winner.name, net).catch(e => {
+      console.warn('global submitWin failed', e);
+    });
+  }
 }
 
 window.playAgain = () => {
@@ -801,11 +821,22 @@ window.playAgain = () => {
 };
 
 // ── LEADERBOARDS (Top Guns) ──
-window.showLeaderboard = () => {
+// Render local instantly for responsiveness, then fetch the global
+// (Cloud Firestore) boards. Global overrides when it has entries;
+// local remains the fallback if the global fetch fails (rules, offline,
+// or Cloud Function not deployed).
+window.showLeaderboard = async () => {
   switchScreen('leaderboard-screen');
-  const { daily, lifetime } = getLeaderboards();
-  renderBoard('daily-board', daily);
-  renderBoard('lifetime-board', lifetime);
+  const local = getLeaderboards();
+  renderBoard('daily-board', local.daily);
+  renderBoard('lifetime-board', local.lifetime);
+  try {
+    const global = await Online.fetchLeaderboards();
+    if (global.daily.length) renderBoard('daily-board', global.daily);
+    if (global.lifetime.length) renderBoard('lifetime-board', global.lifetime);
+  } catch (e) {
+    console.warn('global leaderboards unreachable, showing local only', e);
+  }
 };
 
 function renderBoard(id, entries) {

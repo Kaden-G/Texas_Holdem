@@ -1,6 +1,6 @@
 import { initializeApp, getApps } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
 import { getAuth, signInAnonymously, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js';
-import { getFirestore, doc, collection, onSnapshot } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
+import { getFirestore, doc, collection, onSnapshot, query, orderBy, limit, getDocs } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
 import { getFunctions, httpsCallable } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-functions.js';
 
 const firebaseConfig = {
@@ -36,6 +36,7 @@ const _addAiSeat  = call('addAiSeat');
 const _startHand  = call('startHand');
 const _playerAct  = call('playerAction');
 const _leaveGame  = call('leaveGame');
+const _submitWin  = call('submitWin');
 
 export async function createGame({ displayName, avatarId, deckId }) {
   await waitForAuth();
@@ -68,6 +69,29 @@ export async function playerAction(gameId, action, amount) {
 export async function leaveGame(gameId) {
   await waitForAuth();
   return (await _leaveGame({ gameId })).data;
+}
+
+// Top Guns global leaderboard: submit a win for the current player.
+// Called after a game (single-player or online) is won by a human.
+export async function submitWin(name, winnings) {
+  await waitForAuth();
+  return (await _submitWin({ name, winnings })).data;
+}
+
+// Fetch the current global boards. Returns { daily, lifetime } arrays
+// sorted high→low by winnings, top 10 each. Throws on network / rule
+// error; callers should catch and fall back to local storage.
+export async function fetchLeaderboards() {
+  await waitForAuth();
+  const d = new Date();
+  const p = (n) => String(n).padStart(2, '0');
+  const today = `${d.getUTCFullYear()}-${p(d.getUTCMonth() + 1)}-${p(d.getUTCDate())}`;
+  const toArr = (snap) => snap.docs.map(x => x.data());
+  const [dailySnap, lifetimeSnap] = await Promise.all([
+    getDocs(query(collection(db, `leaderboard/daily/${today}/entries`), orderBy('winnings', 'desc'), limit(10))),
+    getDocs(query(collection(db, `leaderboard/lifetime/entries`), orderBy('winnings', 'desc'), limit(10))),
+  ]);
+  return { daily: toArr(dailySnap), lifetime: toArr(lifetimeSnap) };
 }
 
 // --- Subscriptions ---

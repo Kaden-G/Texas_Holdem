@@ -37,6 +37,14 @@ service cloud.firestore {
       allow write: if false;
     }
 
+    // Top Guns leaderboard. Any signed-in client can read (to render the
+    // boards) but never write — all writes flow through the submitWin
+    // Cloud Function, which uses FieldValue.increment to accumulate.
+    match /leaderboard/{document=**} {
+      allow read: if request.auth != null;
+      allow write: if false;
+    }
+
     // Deny by default for anything else.
     match /{document=**} {
       allow read, write: if false;
