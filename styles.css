@@ -944,21 +944,29 @@ body {
    scroll bar. */
 .hand-ranks {
   width: 100%;
+  max-width: 100%;
   border-collapse: collapse;
-  table-layout: auto;
+  /* Fixed layout so column widths come from <colgroup>, not content —
+     anything longer than its cell wraps or clips and cannot force the
+     table wider than the 300px sidebar. */
+  table-layout: fixed;
 }
 .hand-ranks td {
   padding: 2px 2px;
   vertical-align: baseline;
   border-bottom: 1px dashed rgba(201,168,76,0.13);
+  overflow: hidden;
 }
 .hr-col-num  { width: 1.6em; }
-.hr-col-name { width: auto; }
+.hr-col-name { width: 42%; }
 .hr-col-ex   { width: auto; }
-.hr-col-odds { width: 3.2em; }
-/* .hr-col-my width applied only when the my-odds toggle is on so the
-   column doesn't reserve space when hidden. */
-.hand-ranks.show-my-odds .hr-col-my { width: 3.2em; }
+.hr-col-odds { width: 2.8em; }
+/* When my-odds is on, hide the example column so both odds columns fit
+   without triggering horizontal overflow — the reference example isn't
+   what the player is looking at during a hand anyway. */
+.hand-ranks.show-my-odds .hr-col-my { width: 2.8em; }
+.hand-ranks.show-my-odds .hr-col-ex { width: 0; }
+.hand-ranks.show-my-odds .hr-ex     { display: none; }
 .hr-num {
   color: var(--saloon-gold);
   font-size: 12px;
@@ -997,13 +1005,13 @@ body {
   padding-left: 4px;
 }
 .hr-odds {
-  font-size: 15px;
+  font-size: 13px;
   font-weight: 500;
   color: rgba(232, 210, 154, 0.85);
 }
 .hr-my {
   display: none;
-  font-size: 16px;
+  font-size: 14px;
   font-weight: 700;
   color: var(--saloon-gold);
 }
