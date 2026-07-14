@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>DEAD HAND SALOON — Texas Hold'em</title>
-<link rel="stylesheet" href="styles.css?v=18">
+<link rel="stylesheet" href="styles.css?v=19">
 </head>
 <body>
 
@@ -109,6 +109,16 @@
         <li data-rank="1"><span class="hr-name">One Pair</span><span class="hr-ex">J J</span><span class="hr-odds"></span><span class="hr-my"></span></li>
         <li data-rank="0"><span class="hr-name">High Card</span><span class="hr-ex">A high</span><span class="hr-odds"></span><span class="hr-my"></span></li>
       </ol>
+      <div class="odds-legend">
+        <div class="odds-legend-row">
+          <span class="odds-legend-swatch odds-legend-swatch--static"></span>
+          <span>Baseline % — chance a random Hold'em deal finishes at each rank</span>
+        </div>
+        <div class="odds-legend-row odds-legend-row--my">
+          <span class="odds-legend-swatch odds-legend-swatch--my"></span>
+          <span>Your % — chance <em>your</em> 7 cards finish at each rank this hand</span>
+        </div>
+      </div>
     </div>
   </div>
 </div>
@@ -125,6 +135,6 @@
   </div>
 </div>
 
-<script type="module" src="src/app.js?v=18"></script>
+<script type="module" src="src/app.js?v=19"></script>
 </body>
 </html>
