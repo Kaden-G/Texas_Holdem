@@ -6,6 +6,7 @@ import { AVATARS, avatarMarkup, pickRandomAvatars } from './avatars.js';
 import { DECKS, deckById } from './decks.js';
 import { recordWin, getLeaderboards } from './leaderboard.js';
 import * as Online from './online.js';
+import { STATIC_ODDS, computeMyOdds, fmtPct } from './odds.js';
 
 let G = null;
 let pendingReveal = false;
@@ -873,6 +874,75 @@ function renderGame() {
   renderPot();
   renderActions();
   renderLog();
+  renderOddsPanel();
+}
+
+// ── Hand rankings + odds panel ──
+
+// User preference for showing their own live odds. Persisted so the
+// toggle sticks across page loads.
+let showMyOdds = localStorage.getItem('poker_show_odds') === '1';
+
+function initOddsToggle() {
+  const el = document.getElementById('my-odds-toggle');
+  if (!el || el.dataset.wired) return;
+  el.checked = showMyOdds;
+  el.addEventListener('change', () => {
+    showMyOdds = el.checked;
+    localStorage.setItem('poker_show_odds', showMyOdds ? '1' : '0');
+    renderOddsPanel();
+  });
+  el.dataset.wired = '1';
+  const list = document.getElementById('hand-ranks-list');
+  if (list) list.classList.toggle('show-my-odds', showMyOdds);
+}
+
+// Return the local player's own hole cards in client format, or null
+// if we don't know them (e.g. spectator / hand not dealt yet).
+function myHoleCards() {
+  if (!G) return null;
+  if (mode === 'online') {
+    if (!onlineMyHand || !onlineMyHand.holeCards) return null;
+    if (G.roundNum && onlineMyHand.handNumber && onlineMyHand.handNumber !== G.roundNum) return null;
+    return onlineMyHand.holeCards.map(serverCardToClient).filter(Boolean);
+  }
+  // Single-player: find the human player (only one).
+  const me = G.players.find(p => !p.isAI);
+  if (!me || !me.hand || me.hand.length !== 2) return null;
+  // Skip if hand cards are placeholders (folded or masked).
+  if (me.hand.some(c => !c || c.rank === '?')) return null;
+  return me.hand;
+}
+
+function renderOddsPanel() {
+  initOddsToggle();
+  const list = document.getElementById('hand-ranks-list');
+  if (!list) return;
+
+  // Static prior odds — always visible.
+  list.querySelectorAll('li').forEach(li => {
+    const r = parseInt(li.dataset.rank, 10);
+    const oddsCell = li.querySelector('.hr-odds');
+    if (oddsCell && oddsCell.textContent === '') {
+      oddsCell.textContent = fmtPct(STATIC_ODDS[r]);
+    }
+  });
+
+  list.classList.toggle('show-my-odds', showMyOdds);
+
+  // Live "my odds" — only when toggle is on AND we have hole cards + a
+  // dealt community.
+  if (!showMyOdds) return;
+  const hole = myHoleCards();
+  const community = (G && G.communityCards) || [];
+  const dist = hole && community.length >= 3 ? computeMyOdds(hole, community) : null;
+  list.querySelectorAll('li').forEach(li => {
+    const r = parseInt(li.dataset.rank, 10);
+    const cell = li.querySelector('.hr-my');
+    if (!cell) return;
+    if (!dist) { cell.textContent = '—'; return; }
+    cell.textContent = fmtPct(dist[r]);
+  });
 }
 
 // Real-card face: rank+suit indices in opposite corners, a large center

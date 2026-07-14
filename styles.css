@@ -970,6 +970,43 @@ body {
 }
 .hr-ex .s-red { color: var(--card-red); font-style: normal; }
 
+/* Odds columns. Static odds (.hr-odds) always visible; live per-player
+   odds (.hr-my) only when the panel has .show-my-odds. */
+.hr-odds {
+  font-size: 12px;
+  color: rgba(201, 168, 76, 0.75);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  min-width: 4.5em;
+  text-align: right;
+}
+.hr-my {
+  display: none;
+  font-size: 13px;
+  color: var(--saloon-gold);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  min-width: 4.5em;
+  text-align: right;
+}
+.hand-ranks.show-my-odds .hr-my { display: inline-block; }
+
+/* Toggle in the panel header. */
+.odds-toggle {
+  float: right;
+  font-family: system-ui, -apple-system, sans-serif;
+  font-size: 11px;
+  letter-spacing: 0.5px;
+  color: var(--text-dim);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  text-transform: none;
+}
+.odds-toggle input { cursor: pointer; }
+
 .log-label {
   font-family: 'Rye', cursive;
   font-size: 15px;
