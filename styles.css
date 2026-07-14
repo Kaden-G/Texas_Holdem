@@ -960,11 +960,14 @@ body {
 .hr-col-num  { width: 1.6em; }
 .hr-col-name { width: 42%; }
 .hr-col-ex   { width: auto; }
-.hr-col-odds { width: 2.8em; }
+/* Odds cell widths are sized to fit the widest value the formatter can
+   produce ("<0.01%" — ~6 characters at 13-14px system-ui) so a single
+   number never has its digits clipped or split. */
+.hr-col-odds { width: 3.6em; }
 /* When my-odds is on, hide the example column so both odds columns fit
    without triggering horizontal overflow — the reference example isn't
    what the player is looking at during a hand anyway. */
-.hand-ranks.show-my-odds .hr-col-my { width: 2.8em; }
+.hand-ranks.show-my-odds .hr-col-my { width: 3.6em; }
 .hand-ranks.show-my-odds .hr-col-ex { width: 0; }
 .hand-ranks.show-my-odds .hr-ex     { display: none; }
 .hr-num {
