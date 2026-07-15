@@ -4,22 +4,28 @@ import { evaluateHand, compareHands } from './hand-eval.js';
 export const PHASES = ['preflop', 'flop', 'turn', 'river', 'showdown'];
 export const SMALL_BLIND = 10;
 export const BIG_BLIND = 20;
-export const STARTING_CHIPS = 1000;
+// Deeper starting stack (100 big blinds) so a game plays out over many more
+// hands before the blinds start applying pressure.
+export const STARTING_CHIPS = 2000;
 
-// Escalating blind schedule. Each level lasts LEVEL_SECONDS of real time; by the
-// later levels the blinds dwarf the stacks, forcing all-ins so a game finishes
-// in roughly 10–15 minutes instead of grinding forever.
-export const LEVEL_SECONDS = 100;
+// Escalating blind schedule. Each level lasts LEVEL_SECONDS of real time.
+// The ramp is gentle early (so the first stretch is real poker, not a
+// shove-fest) and only steepens late to guarantee the game still ends.
+// With a 2000 (100BB) stack and 4-minute levels this is roughly a
+// 30–40 minute sit-and-go instead of the old ~5 hands.
+export const LEVEL_SECONDS = 240;
 export const BLIND_LEVELS = [
   { sb: 10,   bb: 20 },
-  { sb: 20,   bb: 40 },
-  { sb: 40,   bb: 80 },
+  { sb: 15,   bb: 30 },
+  { sb: 25,   bb: 50 },
+  { sb: 50,   bb: 100 },
   { sb: 75,   bb: 150 },
-  { sb: 125,  bb: 250 },
-  { sb: 200,  bb: 400 },
-  { sb: 300,  bb: 600 },
-  { sb: 500,  bb: 1000 },
-  { sb: 800,  bb: 1600 },
+  { sb: 100,  bb: 200 },
+  { sb: 150,  bb: 300 },
+  { sb: 250,  bb: 500 },
+  { sb: 400,  bb: 800 },
+  { sb: 600,  bb: 1200 },
+  { sb: 1000, bb: 2000 },
   { sb: 1500, bb: 3000 },
 ];
 
