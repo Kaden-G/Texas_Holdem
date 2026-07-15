@@ -21,6 +21,40 @@ const HAND_NAMES = [
 
 export { HAND_RANKS, HAND_NAMES };
 
+// Rank value → word, singular and plural, for spelling out a hand.
+const RANK_SINGULAR = {
+  2: 'Two', 3: 'Three', 4: 'Four', 5: 'Five', 6: 'Six', 7: 'Seven',
+  8: 'Eight', 9: 'Nine', 10: 'Ten', 11: 'Jack', 12: 'Queen', 13: 'King', 14: 'Ace',
+};
+const RANK_PLURAL = {
+  2: 'Twos', 3: 'Threes', 4: 'Fours', 5: 'Fives', 6: 'Sixes', 7: 'Sevens',
+  8: 'Eights', 9: 'Nines', 10: 'Tens', 11: 'Jacks', 12: 'Queens', 13: 'Kings', 14: 'Aces',
+};
+const sng = v => RANK_SINGULAR[v] || '?';
+const plu = v => RANK_PLURAL[v] || '?';
+
+// Full human description of an evaluated hand, including the deciding
+// kicker — e.g. "Two Pair, Queens & Fives, Ace kicker". `ev` is the
+// object returned by evaluateHand (has .rank and .kickers). Kicker
+// meaning by rank is defined by evaluateFive below.
+export function describeHand(ev) {
+  if (!ev) return '';
+  const k = ev.kickers || [];
+  switch (ev.rank) {
+    case HAND_RANKS.ROYAL_FLUSH:    return 'Royal Flush';
+    case HAND_RANKS.STRAIGHT_FLUSH: return `Straight Flush, ${sng(k[0])} high`;
+    case HAND_RANKS.FOUR_KIND:      return `Four ${plu(k[0])}${k[1] ? `, ${sng(k[1])} kicker` : ''}`;
+    case HAND_RANKS.FULL_HOUSE:     return `Full House, ${plu(k[0])} over ${plu(k[1])}`;
+    case HAND_RANKS.FLUSH:          return `Flush, ${sng(k[0])} high`;
+    case HAND_RANKS.STRAIGHT:       return `Straight, ${sng(k[0])} high`;
+    case HAND_RANKS.THREE_KIND:     return `Three ${plu(k[0])}${k[1] ? `, ${sng(k[1])} kicker` : ''}`;
+    case HAND_RANKS.TWO_PAIR:       return `Two Pair, ${plu(k[0])} & ${plu(k[1])}${k[2] ? `, ${sng(k[2])} kicker` : ''}`;
+    case HAND_RANKS.PAIR:           return `Pair of ${plu(k[0])}${k[1] ? `, ${sng(k[1])} kicker` : ''}`;
+    case HAND_RANKS.HIGH_CARD:      return `${sng(k[0])} High`;
+    default:                        return HAND_NAMES[ev.rank] || 'High Card';
+  }
+}
+
 function combinations(arr, k) {
   if (k === 0) return [[]];
   if (arr.length < k) return [];

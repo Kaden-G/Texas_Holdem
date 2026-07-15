@@ -777,11 +777,18 @@ body {
 
 .hand-label {
   font-family: 'Rye', cursive;
-  font-size: 12px;
+  font-size: 11px;
   color: var(--saloon-gold-bright);
   margin-top: 4px;
-  letter-spacing: 1px;
+  letter-spacing: 0.3px;
+  line-height: 1.25;
   text-shadow: 0 1px 2px rgba(0,0,0,0.6);
+  /* Descriptive names ("Two Pair, Queens & Fives, Ace kicker") wrap to a
+     couple of lines inside the seat column instead of overflowing. */
+  max-width: 140px;
+  margin-left: auto;
+  margin-right: auto;
+  text-wrap: balance;
 }
 
 .win-badge {

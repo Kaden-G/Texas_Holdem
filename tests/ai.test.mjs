@@ -168,3 +168,32 @@ test('never returns call with nothing to call, never checks facing a bet', () =>
     }
   }
 });
+
+// ── describeHand: full descriptions with kickers ──
+import { evaluateHand, describeHand } from '../src/hand-eval.js';
+
+function hand(holeArr, boardArr) {
+  const mk = ([r, s]) => card(r, s);
+  return describeHand(evaluateHand(holeArr.map(mk), boardArr.map(mk)));
+}
+
+test('describeHand spells out two pair with the deciding kicker', () => {
+  // The actual bug-report hand: board 5♥ Q♣ 3♦ Q♥ 5♠ (Queens & Fives).
+  const board = [[5,H],['Q',C],[3,D],['Q',H],[5,S]];
+  assert.equal(hand([['A',C],[6,H]], board), 'Two Pair, Queens & Fives, Ace kicker');
+  assert.equal(hand([[10,S],[7,S]], board), 'Two Pair, Queens & Fives, Ten kicker');
+  assert.equal(hand([[8,D],[3,H]], board), 'Two Pair, Queens & Fives, Eight kicker');
+});
+
+test('describeHand covers the other ranks', () => {
+  assert.equal(hand([['A',S],['K',S]], [['Q',S],['J',S],[10,S],[2,D],[3,C]]), 'Royal Flush');
+  assert.equal(hand([[9,H],[8,H]], [[7,H],[6,H],[5,H],[2,S],['A',C]]), 'Straight Flush, Nine high');
+  assert.equal(hand([['K',S],['K',H]], [['K',D],['K',C],[2,H],[7,S],[9,D]]), 'Four Kings, Nine kicker');
+  assert.equal(hand([['K',S],['K',H]], [['K',D],[10,C],[10,H],[2,S],[3,D]]), 'Full House, Kings over Tens');
+  assert.equal(hand([['A',D],[9,D]], [[5,D],[7,D],[2,D],['K',S],[3,C]]), 'Flush, Ace high');
+  assert.equal(hand([[9,C],[8,D]], [[10,H],[7,S],[6,D],[2,C],['A',H]]), 'Straight, Ten high');
+  assert.equal(hand([[7,C],[7,D]], [[7,H],['A',S],['K',D],[2,C],[3,H]]), 'Three Sevens, Ace kicker');
+  assert.equal(hand([['A',C],['A',D]], [['A',S],[9,H],[4,C],[2,D],[3,S]]), 'Three Aces, Nine kicker');
+  assert.equal(hand([['J',C],['J',D]], [[2,S],[7,H],[9,C],['A',D],[4,S]]), 'Pair of Jacks, Ace kicker');
+  assert.equal(hand([['A',C],['K',D]], [[9,S],[7,H],[4,C],[2,D],[3,S]]), 'Ace High');
+});
