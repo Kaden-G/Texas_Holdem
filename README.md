@@ -43,11 +43,13 @@ Then open **http://localhost:8000**.
 ## How to play
 
 1. **Sit Down** → choose opponents (1–5), enter your name, pick your look.
-2. **Deal 'Em** to start. Everyone begins with **$1,000**.
+2. **Deal 'Em** to start. Everyone begins with **$2,000** (100 big blinds).
 3. Use **Fold / Check / Call / Raise / All-In** on your turn. Use the quick-bet
    chips or the slider to size a raise.
 4. Win all the chips at the table to win the game. Your net profit (winnings
-   above the $1,000 buy-in) is added to the Top Guns boards.
+   above the $2,000 buy-in) is added to the Top Guns boards. Blinds start at
+   $10/$20 and rise slowly, so a full game runs a good while longer than a
+   handful of hands.
 
 ## Project structure
 
