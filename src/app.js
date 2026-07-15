@@ -1,7 +1,7 @@
 import { createDeck, shuffleDeck, cardId, isRed, SUITS, RANKS, RANK_VALUES } from './cards.js';
 import { evaluateHand, HAND_NAMES, HAND_RANKS } from './hand-eval.js';
 import { createGame, startHand, applyAction, getValidActions, isHandOver, isGameOver, getGameWinner, PHASES, BIG_BLIND, STARTING_CHIPS, BLIND_LEVELS, LEVEL_SECONDS } from './engine.js';
-import { getAIPersonalities, aiDecision } from './ai.js';
+import { getAIPersonalities, aiDecision, personalityFromStyle, tablePosition } from './ai.js';
 import { AVATARS, avatarMarkup, pickRandomAvatars } from './avatars.js';
 import { DECKS, deckById } from './decks.js';
 import { recordWin, getLeaderboards } from './leaderboard.js';
@@ -483,6 +483,8 @@ function stateFromDoc(doc) {
       avatar: s.avatarId || null,
       chips: s.stack,
       currentBet: s.committedThisStreet || 0,
+      totalBet: s.committedThisHand || 0,
+      personalityId: s.personalityId || null,
       folded: s.status === 'folded',
       allIn: s.status === 'all_in',
       hand,
@@ -589,13 +591,10 @@ async function driveOnlineAiTurn() {
   clearTimeout(onlineAiTimer);
   onlineAiTimer = setTimeout(async () => {
     try {
-      const personalitySeed = active.name.charCodeAt(0);
-      const personality = {
-        name: active.name,
-        aggression: 0.4 + ((personalitySeed % 5) * 0.1),
-        loose: 0.3 + ((personalitySeed % 3) * 0.15),
-        style: 'calculated',
-      };
+      // Rebuild the archetype assigned at addAiSeat time (stored on the
+      // seat as personalityId) with name-seeded jitter, so bots actually
+      // play their advertised tight/aggressive/calculated/loose styles.
+      const personality = personalityFromStyle(active.personalityId, active.name);
       const decision = aiDecision(
         { ...active, hand: holeClient, personality },
         {
@@ -603,6 +602,8 @@ async function driveOnlineAiTurn() {
           pot: G.pot,
           currentBet: G.currentBet,
           minRaise: G.minRaise,
+          bigBlind: G.bigBlind,
+          position: tablePosition(G.players, G.dealerIndex, G.activeIndex),
         },
       );
       // Sanitize the decision against current server state before sending.
@@ -756,6 +757,8 @@ function checkAITurn() {
         pot: G.pot,
         currentBet: G.currentBet,
         minRaise: G.minRaise,
+        bigBlind: G.bigBlind || BIG_BLIND,
+        position: tablePosition(G.players, G.dealerIndex, G.activeIndex),
       });
 
       if (decision.action === 'raise') {
