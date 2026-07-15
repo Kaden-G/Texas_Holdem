@@ -1,5 +1,5 @@
 import { createDeck, shuffleDeck, cardId, isRed, SUITS, RANKS, RANK_VALUES } from './cards.js';
-import { evaluateHand, HAND_NAMES, HAND_RANKS } from './hand-eval.js';
+import { evaluateHand, HAND_NAMES, HAND_RANKS, describeHand } from './hand-eval.js';
 import { createGame, startHand, applyAction, getValidActions, isHandOver, isGameOver, getGameWinner, PHASES, BIG_BLIND, STARTING_CHIPS, BLIND_LEVELS, LEVEL_SECONDS } from './engine.js';
 import { getAIPersonalities, aiDecision, personalityFromStyle, tablePosition } from './ai.js';
 import { AVATARS, avatarMarkup, pickRandomAvatars } from './avatars.js';
@@ -176,7 +176,7 @@ function deriveOnlineLog(prev, next) {
         type: 'win',
         player: _nameForUid(next, w.uid),
         amount: w.amount,
-        hand: w.handRank || 'the pot',
+        hand: onlineHandName(next, w.uid, w.handRank || 'the pot'),
       });
     }
   }
@@ -451,6 +451,26 @@ function serverCardToClient(c) {
   return { rank, suit, value: RANK_VALUES[rank] };
 }
 
+// Rich winning-hand description for online showdowns. The server only
+// sends a short handRank string (no kicker), but at showdown we already
+// have the winner's revealed hole cards + the community, so we re-derive
+// the full "Two Pair, Queens & Fives, Ace kicker" text client-side —
+// identical to single-player, no server change needed. Falls back to the
+// server string (fold-around wins have no revealed cards).
+function onlineHandName(doc, uid, fallback) {
+  const revealed = doc?.showdown?.revealed?.[uid];
+  const community = doc?.communityCards;
+  if (!revealed || revealed.length < 2 || !community || community.length < 3) return fallback;
+  const hole = revealed.map(serverCardToClient).filter(Boolean);
+  const board = community.map(serverCardToClient).filter(Boolean);
+  if (hole.length < 2 || board.length < 3) return fallback;
+  try {
+    return describeHand(evaluateHand(hole, board));
+  } catch (_) {
+    return fallback;
+  }
+}
+
 // Convert the Firestore game doc (+ my hole cards + AI hole cards if host)
 // into a G-shaped object the single-player render loop can consume.
 function stateFromDoc(doc) {
@@ -496,7 +516,7 @@ function stateFromDoc(doc) {
   const winnersArr = (doc.showdown?.winners || []).map(w => ({
     player: players.find(p => p.uid === w.uid) || null,
     amount: w.amount,
-    hand: w.handRank,
+    hand: onlineHandName(doc, w.uid, w.handRank),
   })).filter(w => w.player);
 
   return {
@@ -1054,11 +1074,11 @@ function renderPlayers() {
     let handLabel = '';
     if (showCards && isMe && G.communityCards.length > 0 && p.hand.length === 2 && !p.folded) {
       const eval_ = evaluateHand(p.hand, G.communityCards);
-      handLabel = `<div class="hand-label">${eval_.name}</div>`;
+      handLabel = `<div class="hand-label">${describeHand(eval_)}</div>`;
     }
     if (showCards && !isMe && pendingReveal && p.hand.length === 2 && !p.folded && G.communityCards.length > 0) {
       const eval_ = evaluateHand(p.hand, G.communityCards);
-      handLabel = `<div class="hand-label">${eval_.name}</div>`;
+      handLabel = `<div class="hand-label">${describeHand(eval_)}</div>`;
     }
 
     const winnerInfo = G.winners?.find(w => w.player.id === p.id);

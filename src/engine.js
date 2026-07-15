@@ -1,5 +1,5 @@
 import { createDeck, shuffleDeck, cardId } from './cards.js';
-import { evaluateHand, compareHands } from './hand-eval.js';
+import { evaluateHand, compareHands, describeHand } from './hand-eval.js';
 
 export const PHASES = ['preflop', 'flop', 'turn', 'river', 'showdown'];
 export const SMALL_BLIND = 10;
@@ -375,7 +375,7 @@ function resolveShowdown(game) {
       w.player.chips += amt;
       const cur = wonByPlayer.get(w.player.id);
       if (cur) cur.amount += amt;
-      else wonByPlayer.set(w.player.id, { player: w.player, amount: amt, hand: w.eval.name });
+      else wonByPlayer.set(w.player.id, { player: w.player, amount: amt, hand: describeHand(w.eval) });
     }
   }
 
